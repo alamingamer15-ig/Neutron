@@ -1,14 +1,15 @@
 # Neutron architecture specification
 
 **Status:** Initial design baseline; subject to revision as feasibility is tested.  
-**Target:** x86-64 Linux applications on ARM64 Android.
+**Target:** native ARM64 Linux userspace plus translated x86-64 Linux applications on ARM64 Android.
 
 This document records the current project decisions. A design choice is not a claim that the feature is already implemented or universally possible on Android hardware.
 
 ## 1. Goals and constraints
 
 - Host ABI: Android ARM64/AArch64.
-- Guest ABI: Linux x86-64 only for the initial scope; no x86 32-bit ABI commitment.
+- Native userspace ABI: Linux AArch64/ARM64, matching the Android host architecture.
+- Translated application ABI: Linux x86-64 only for the initial scope; no x86 32-bit ABI commitment.
 - No root requirement.
 - Android SELinux remains enforcing.
 - One active guest application at a time. That application may create guest threads and, as compatibility is implemented, child processes.
@@ -37,7 +38,7 @@ Native ARM64 execution threads
 Android Linux kernel + Android graphics/audio/input APIs
 ```
 
-The root filesystem supplies guest userspace files, libraries, utilities, configuration, and package management. It is not a kernel, CPU translator, or substitute for Android's host kernel.
+The default root filesystem is AArch64/ARM64: its shell, BusyBox utilities, and base userspace run natively on the Android host. Selected x86-64 application ELFs and their x86-64 libraries are translated by Neutron. The root filesystem is not a kernel, CPU translator, or substitute for Android's host kernel.
 
 ## 3. Dynamic binary translation
 
@@ -108,7 +109,8 @@ Compatibility is progressive. Unsupported or unsafe operations must fail clearly
 
 - Neutron-managed lightweight Linux userspace.
 - `apk` is the planned package manager; external repositories are intended.
-- Native ARM64 Neutron utilities run as host-native code. Guest applications and guest libraries use the x86-64 guest ABI and DBT.
+- The default rootfs contains ARM64 glibc and native ARM64 utilities; its shell runs natively on the host.
+- Selected x86-64 application ELFs and their x86-64 libraries use the x86-64 guest ABI and DBT. Do not mix x86-64 guest libraries into the ARM64 base rootfs.
 - Guest libc and dynamic-linker strategy remains an explicit design decision. Generic Linux ELF compatibility must not be confused with universal compatibility across glibc- and musl-based environments.
 - Writable rootfs with protected system directories.
 - Rootfs reset and recovery support.
@@ -210,7 +212,7 @@ The exact PulseAudio-compatible server/bridge design, stream formats, mixing, an
 
 The following require prototypes, tests, or explicit decisions before they can be considered settled:
 
-1. Guest libc and dynamic-linker strategy (glibc, musl, or a deliberately separated compatibility arrangement).
+1. x86-64 guest libc and dynamic-linker strategy (glibc, musl, or a deliberately separated compatibility arrangement); the base ARM64 rootfs uses glibc.
 2. Exact IR design, instruction-to-IR lowering rules, and unsupported-instruction behavior.
 3. Guest virtual-address layout and safe executable-memory strategy on Android.
 4. Complete syscall support matrix and signal/futex semantics.

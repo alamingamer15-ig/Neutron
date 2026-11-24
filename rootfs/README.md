@@ -1,18 +1,18 @@
 # Neutron minimal glibc rootfs
 
-Neutron's default guest filesystem is built with Buildroot, using an x86-64 target,
-glibc, and BusyBox. It is intended as a minimal userspace base rather than a full
+Neutron's default guest filesystem is built with Buildroot, using an AArch64 target,
+glibc, and BusyBox. It is intended as a minimal native ARM64 userspace base rather than a full
 general-purpose distribution.
 
 ## Contents
 
-- x86-64 glibc runtime and ELF dynamic loader
+- AArch64 glibc runtime and ELF dynamic loader
 - BusyBox /bin/sh and basic Unix utilities
 - /bin, /lib, /lib64, /home, /dev, /proc, /sys, /tmp, /run, /mnt
 - /etc/neutron-rootfs-release marker
 
 This is a userspace root filesystem, not a Linux kernel. Neutron still needs its ELF
-loader, x86-64 execution engine, syscall layer, process model, and filesystem setup
+loader, AArch64 execution engine, syscall layer, process model, and filesystem setup
 before guest programs can run.
 
 ## Rebuild

@@ -24,7 +24,7 @@ import java.util.Locale;
 import java.util.stream.Stream;
 
 public final class RootfsInstaller {
-    private static final String ROOTFS_ARCHIVE = "neutron-x86_64-glibc.tar.gz";
+    private static final String ROOTFS_ARCHIVE = "neutron-aarch64-glibc.tar.gz";
     private static final String BASE_URL =
             "https://raw.githubusercontent.com/alamingamer15-ig/Neutron/main/rootfs/images/";
     
@@ -41,20 +41,21 @@ public final class RootfsInstaller {
     }
 
     public static File getRootfsDirectory(Context context) {
-        return new File(context.getFilesDir(), "rootfs/neutron-x86_64-glibc");
+        return new File(context.getFilesDir(), "rootfs/neutron-aarch64-glibc");
     }
 
     public static boolean isInstalled(Context context) {
         File root = getRootfsDirectory(context);
-        boolean loader = new File(root, "lib64/ld-linux-x86-64.so.2").isFile()
-                || new File(root, "lib/ld-linux-x86-64.so.2").isFile();
+        boolean loader = new File(root, "lib64/ld-linux-aarch64.so.1").isFile()
+                || new File(root, "lib/ld-linux-aarch64.so.1").isFile();
         return new File(root, "bin").isDirectory()
                 && new File(root, "lib").isDirectory()
                 && new File(root, "home").isDirectory()
                 && new File(root, "dev").isDirectory()
                 && new File(root, "proc").isDirectory()
                 && new File(root, "etc/neutron-rootfs-release").isFile()
-                && loader;
+                && loader
+                && isAarch64Elf(new File(root, "bin/busybox"));
     }
 
     public static File install(Context context, ProgressListener listener) throws Exception {
@@ -68,7 +69,7 @@ public final class RootfsInstaller {
             throw new IllegalStateException("Cannot create installer workspace");
         }
         File archive = new File(work, ROOTFS_ARCHIVE + ".part");
-        File staging = new File(root.getParentFile(), "neutron-x86_64-glibc.installing");
+        File staging = new File(root.getParentFile(), "neutron-aarch64-glibc.installing");
         deleteRecursively(staging.toPath());
 
         String expectedHash = readExpectedHash(new URL(BASE_URL + ROOTFS_ARCHIVE + ".sha256"));
@@ -93,9 +94,28 @@ File parent = root.getParentFile();
         archive.delete();
 
         if (!isInstalled(context)) {
-            throw new IllegalStateException("Rootfs failed glibc validation");
+            throw new IllegalStateException("Rootfs failed ARM64 glibc validation");
         }
         return root;
+    }
+
+    private static boolean isAarch64Elf(File file) {
+        if (!file.isFile()) return false;
+        try (InputStream input = new FileInputStream(file)) {
+            byte[] header = new byte[20];
+            int offset = 0;
+            while (offset < header.length) {
+                int count = input.read(header, offset, header.length - offset);
+                if (count < 0) return false;
+                offset += count;
+            }
+            int machine = (header[18] & 0xff) | ((header[19] & 0xff) << 8);
+            return header[0] == 0x7f && header[1] == 'E' && header[2] == 'L'
+                    && header[3] == 'F' && header[4] == 2 && header[5] == 1
+                    && machine == 183;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private static String readExpectedHash(URL url) throws Exception {
@@ -113,7 +133,7 @@ File parent = root.getParentFile();
             String value = new String(output.toByteArray(), "UTF-8").trim();
             String hash = value.split("\\s+")[0].toLowerCase(Locale.ROOT);
             if (!hash.matches("[0-9a-f]{64}")) {
-                throw new IllegalStateException("Invalid Alpine checksum response");
+                throw new IllegalStateException("Invalid rootfs checksum response");
             }
             return hash;
         } finally {

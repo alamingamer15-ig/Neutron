@@ -13,12 +13,15 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
+import android.text.InputType;
 import android.widget.TextView;
 import android.widget.Toast;
 import java.io.File;
+import java.io.InputStream;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -36,9 +39,13 @@ import java.util.Set;
 public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_PICK_ELF = 41;
     private static final int REQUEST_PICK_ROOTFS = 42;
+    private static final int REQUEST_PICK_TERMINAL_ELF = 43;
     private static final String PREFS = "neutron_ui";
     private static final String PREF_SELECTED_FILES = "selected_files";
     private static final String PREF_ROOTFS_URI = "rootfs_tree_uri";
+    private static final String PREF_TERMINAL_ELF_URI = "terminal_elf_uri";
+    private static final String PREF_TERMINAL_ELF_NAME = "terminal_elf_name";
+    private static final String PREF_ROOTFS_RETURN_TERMINAL = "rootfs_return_terminal";
     private static final String PREF_GUEST_RAM_MB = "guest_ram_limit_mb";
     private static final int DEFAULT_GUEST_RAM_MB = 512;
     private static final int MIN_GUEST_RAM_MB = 256;
@@ -114,7 +121,7 @@ public class MainActivity extends AppCompatActivity {
         headingParams.topMargin = dp(7);
         content.addView(heading, headingParams);
 
-        TextView intro = text("Run x86-64 Linux applications on your Android device.", 14,
+        TextView intro = text("Run native ARM64 Linux tools and translate x86-64 applications on Android.", 14,
                 R.color.neutron_muted, false);
         LinearLayout.LayoutParams introParams = params(-1, -2);
         introParams.topMargin = dp(5);
@@ -323,35 +330,102 @@ public class MainActivity extends AppCompatActivity {
         ScrollView page = createPage();
         LinearLayout content = pageContent(page);
         content.addView(text("Linux terminal", 25, R.color.neutron_text, true));
-        TextView subtitle = text("A shell for your guest environment.", 14, R.color.neutron_muted, false);
+        TextView subtitle = text("Run the ARM64 shell from your selected Linux rootfs.", 14,
+                R.color.neutron_muted, false);
         LinearLayout.LayoutParams subtitleParams = params(-1, -2);
         subtitleParams.topMargin = dp(6);
         content.addView(subtitle, subtitleParams);
+
+        MaterialCardView rootfsCard = card();
+        LinearLayout rootfsBody = new LinearLayout(this);
+        rootfsBody.setOrientation(LinearLayout.VERTICAL);
+        rootfsBody.setPadding(dp(16), dp(15), dp(16), dp(15));
+        rootfsBody.addView(text("ROOT FILESYSTEM", 10, R.color.neutron_primary, true));
+        TextView rootfsStatus = text(getRootfsStatus(), 12,
+                isRootfsValid() ? R.color.neutron_primary : R.color.neutron_muted, false);
+        LinearLayout.LayoutParams rootfsStatusParams = params(-1, -2);
+        rootfsStatusParams.topMargin = dp(6);
+        rootfsBody.addView(rootfsStatus, rootfsStatusParams);
+
+        MaterialButton chooseRootfs = button("Pick rootfs folder");
+        chooseRootfs.setOnClickListener(v -> chooseRootfsFolder(true));
+        LinearLayout.LayoutParams chooseRootfsParams = params(-1, -2);
+        chooseRootfsParams.topMargin = dp(12);
+        rootfsBody.addView(chooseRootfs, chooseRootfsParams);
+
+        MaterialButton defaultRootfs = button("Use default ARM64 rootfs");
+        defaultRootfs.setOnClickListener(v -> installDefaultRootfs(rootfsStatus, defaultRootfs, true));
+        LinearLayout.LayoutParams defaultRootfsParams = params(-1, -2);
+        defaultRootfsParams.topMargin = dp(8);
+        rootfsBody.addView(defaultRootfs, defaultRootfsParams);
+        rootfsCard.addView(rootfsBody);
+        LinearLayout.LayoutParams rootfsCardParams = params(-1, -2);
+        rootfsCardParams.topMargin = dp(18);
+        content.addView(rootfsCard, rootfsCardParams);
+
+        MaterialButton chooseShell = button("Choose terminal ELF binary");
+        chooseShell.setOnClickListener(v -> chooseTerminalElf());
+        LinearLayout.LayoutParams chooseShellParams = params(-1, -2);
+        chooseShellParams.topMargin = dp(16);
+        content.addView(chooseShell, chooseShellParams);
+
+        String shellName = getPreferences().getString(PREF_TERMINAL_ELF_NAME, null);
+        TextView shellStatus = text(shellName == null
+                        ? "No terminal binary selected. Choose an ARM64 shell ELF (sh, ash, bash, or BusyBox)."
+                        : "Terminal ELF: " + shellName + " · AArch64 validated",
+                12, shellName == null ? R.color.neutron_muted : R.color.neutron_primary, false);
+        LinearLayout.LayoutParams shellStatusParams = params(-1, -2);
+        shellStatusParams.topMargin = dp(8);
+        content.addView(shellStatus, shellStatusParams);
 
         MaterialCardView terminalCard = card();
         terminalCard.setCardBackgroundColor(0xFF0B1018);
         LinearLayout terminal = new LinearLayout(this);
         terminal.setOrientation(LinearLayout.VERTICAL);
         terminal.setPadding(dp(16), dp(18), dp(16), dp(18));
-        TextView terminalHeader = text("NEUTRON / GUEST SHELL", 10, R.color.neutron_primary, true);
-        terminal.addView(terminalHeader);
-        TextView terminalMessage = text("neutron:~$  status\n\nRuntime connection unavailable.\nThe guest shell will be enabled after the native runtime is integrated.",
+        terminal.addView(text("NEUTRON / ARM64 SHELL", 10, R.color.neutron_primary, true));
+
+        TextView transcript = text(shellName == null
+                        ? "Select a valid ARM64 terminal ELF to open the shell.\n"
+                        : "$ ",
                 13, R.color.neutron_text, false);
-        terminalMessage.setTypeface(Typeface.MONOSPACE);
-        terminalMessage.setLineSpacing(dp(5), 1.0f);
-        LinearLayout.LayoutParams messageParams = params(-1, -2);
-        messageParams.topMargin = dp(18);
-        terminal.addView(terminalMessage, messageParams);
+        transcript.setTypeface(Typeface.MONOSPACE);
+        transcript.setLineSpacing(dp(5), 1.0f);
+        LinearLayout.LayoutParams transcriptParams = params(-1, -2);
+        transcriptParams.topMargin = dp(18);
+        terminal.addView(transcript, transcriptParams);
+
+        EditText command = new EditText(this);
+        command.setSingleLine(true);
+        command.setTextSize(13);
+        command.setTypeface(Typeface.MONOSPACE);
+        command.setHint("Command");
+        command.setInputType(InputType.TYPE_CLASS_TEXT);
+        command.setEnabled(false);
+        command.setAlpha(0.55f);
+        LinearLayout.LayoutParams commandParams = params(-1, -2);
+        commandParams.topMargin = dp(10);
+        terminal.addView(command, commandParams);
+
+        MaterialButton execute = button("Run command");
+        execute.setEnabled(false);
+        execute.setAlpha(0.45f);
+        LinearLayout.LayoutParams executeParams = params(-1, -2);
+        executeParams.topMargin = dp(8);
+        terminal.addView(execute, executeParams);
+
+        TextView backendInfo = text(shellName == null
+                        ? "The prompt will become active after a valid shell is selected and the process backend is connected."
+                        : "Shell ELF accepted. Command execution and stdout are waiting for Neutron's ARM64 process/syscall backend; this build will not fake command output.",
+                12, R.color.neutron_muted, false);
+        LinearLayout.LayoutParams backendInfoParams = params(-1, -2);
+        backendInfoParams.topMargin = dp(12);
+        terminal.addView(backendInfo, backendInfoParams);
+
         terminalCard.addView(terminal);
         LinearLayout.LayoutParams terminalParams = params(-1, -2);
-        terminalParams.topMargin = dp(20);
+        terminalParams.topMargin = dp(16);
         content.addView(terminalCard, terminalParams);
-
-        TextView info = text("This is a terminal preview, not an active shell. Commands are not executed in this version.",
-                12, R.color.neutron_muted, false);
-        LinearLayout.LayoutParams infoParams = params(-1, -2);
-        infoParams.topMargin = dp(15);
-        content.addView(info, infoParams);
         return page;
     }
 
@@ -489,11 +563,11 @@ public class MainActivity extends AppCompatActivity {
         statusParams.topMargin = dp(5);
         body.addView(status, statusParams);
 
-        MaterialButton installAlpine = button("Install Neutron glibc rootfs (x86-64)");
-        installAlpine.setOnClickListener(v -> installAlpineRootfs(status, installAlpine));
+        MaterialButton installDefault = button("Install default ARM64 glibc rootfs");
+        installDefault.setOnClickListener(v -> installDefaultRootfs(status, installDefault, false));
         LinearLayout.LayoutParams installParams = params(-1, -2);
         installParams.topMargin = dp(12);
-        body.addView(installAlpine, installParams);
+        body.addView(installDefault, installParams);
 
         MaterialButton chooseRootfs = button("Choose existing rootfs folder");
         chooseRootfs.setOnClickListener(v -> chooseRootfsFolder());
@@ -508,21 +582,21 @@ public class MainActivity extends AppCompatActivity {
         parent.addView(rootfsCard, cardParams);
     }
 
-    private void installAlpineRootfs(TextView status, MaterialButton installButton) {
+    private void installDefaultRootfs(TextView status, MaterialButton installButton, boolean returnToTerminal) {
         installButton.setEnabled(false);
-        status.setText("Downloading Neutron glibc rootfs…");
+        status.setText("Downloading Neutron ARM64 glibc rootfs…");
         new Thread(() -> {
             try {
                 File installed = RootfsInstaller.install(this, percent ->
                         runOnUiThread(() -> status.setText(
-                                percent < 0 ? "Extracting glibc rootfs…" :
-                                        "Downloading glibc rootfs… " + percent + "%")));
+                                percent < 0 ? "Extracting ARM64 glibc rootfs…" :
+                                        "Downloading ARM64 glibc rootfs… " + percent + "%")));
                 runOnUiThread(() -> {
-                    status.setText("Neutron minimal glibc · x86-64 · installed in app storage");
-                    installButton.setText("Reinstall glibc rootfs");
+                    status.setText("Neutron minimal glibc · ARM64 · installed in app storage");
+                    installButton.setText("Reinstall ARM64 rootfs");
                     installButton.setEnabled(true);
                     Toast.makeText(this, "Neutron glibc rootfs installed.", Toast.LENGTH_LONG).show();
-                    showScreen(R.id.nav_apps);
+                    showScreen(returnToTerminal ? R.id.nav_terminal : R.id.nav_apps);
                 });
             } catch (Exception error) {
                 runOnUiThread(() -> {
@@ -535,6 +609,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void chooseRootfsFolder() {
+        chooseRootfsFolder(false);
+    }
+
+    private void chooseRootfsFolder(boolean returnToTerminal) {
+        getPreferences().edit().putBoolean(PREF_ROOTFS_RETURN_TERMINAL, returnToTerminal).apply();
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
                 | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
@@ -595,29 +674,94 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             }
-            return missing.isEmpty();
+            if (!missing.isEmpty()) return false;
+            return hasChildDocument(treeUri, rootDocumentId, "lib", "ld-linux-aarch64.so.1")
+                    || hasChildDocument(treeUri, rootDocumentId, "lib64", "ld-linux-aarch64.so.1");
         } catch (Exception ignored) {
             return false;
         }
     }
 
+    private boolean hasChildDocument(Uri treeUri, String parentId, String directory, String fileName) {
+        try {
+            Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId);
+            String directoryId = null;
+            try (Cursor cursor = getContentResolver().query(children,
+                    new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                            DocumentsContract.Document.COLUMN_MIME_TYPE}, null, null, null)) {
+                if (cursor == null) return false;
+                while (cursor.moveToNext()) {
+                    if (directory.equals(cursor.getString(1))
+                            && DocumentsContract.Document.MIME_TYPE_DIR.equals(cursor.getString(2))) {
+                        directoryId = cursor.getString(0);
+                        break;
+                    }
+                }
+            }
+            if (directoryId == null) return false;
+            Uri nested = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, directoryId);
+            try (Cursor cursor = getContentResolver().query(nested,
+                    new String[]{DocumentsContract.Document.COLUMN_DISPLAY_NAME}, null, null, null)) {
+                if (cursor == null) return false;
+                while (cursor.moveToNext()) {
+                    if (fileName.equals(cursor.getString(0))) return true;
+                }
+            }
+        } catch (Exception ignored) {
+            return false;
+        }
+        return false;
+    }
+
     private String getRootfsStatus() {
         if (RootfsInstaller.isInstalled(this)) {
-            return "Neutron minimal glibc · x86-64 · app-private storage";
+            return "Neutron minimal glibc · ARM64 · app-private storage";
         }
         if (getSavedRootfsUri() == null) {
             return "No rootfs selected. Launch is disabled.";
         }
         if (isRootfsValid()) {
-            return "Valid rootfs · /bin, /lib, /home, /dev and /proc found.";
+            return "Valid ARM64 rootfs · required directories and AArch64 glibc loader found.";
         }
-        return "Invalid or inaccessible rootfs. Required directories: /bin, /lib, /home, /dev and /proc.";
+        return "Invalid or inaccessible rootfs. It must contain /bin, /lib, /home, /dev, /proc and the AArch64 glibc loader.";
     }
 
     @Nullable
     private Uri getSavedRootfsUri() {
         String value = getPreferences().getString(PREF_ROOTFS_URI, null);
         return value == null ? null : Uri.parse(value);
+    }
+
+    private void chooseTerminalElf() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        startActivityForResult(intent, REQUEST_PICK_TERMINAL_ELF);
+    }
+
+    private boolean isArm64TerminalElf(Uri uri, String name) {
+        String lower = name == null ? "" : name.toLowerCase(java.util.Locale.ROOT);
+        boolean shellName = lower.equals("sh") || lower.equals("ash") || lower.equals("bash")
+                || lower.equals("busybox") || lower.equals("dash") || lower.equals("zsh");
+        if (!shellName) return false;
+        try (InputStream input = getContentResolver().openInputStream(uri)) {
+            if (input == null) return false;
+            byte[] header = new byte[20];
+            int offset = 0;
+            while (offset < header.length) {
+                int count = input.read(header, offset, header.length - offset);
+                if (count < 0) return false;
+                offset += count;
+            }
+            if (header[0] != 0x7f || header[1] != 'E' || header[2] != 'L' || header[3] != 'F') return false;
+            if (header[4] != 2 || header[5] != 1) return false;
+            int type = (header[16] & 0xff) | ((header[17] & 0xff) << 8);
+            int machine = (header[18] & 0xff) | ((header[19] & 0xff) << 8);
+            return (type == 2 || type == 3) && machine == 183;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private void chooseElfFile() {
@@ -630,7 +774,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if ((requestCode != REQUEST_PICK_ELF && requestCode != REQUEST_PICK_ROOTFS)
+        if ((requestCode != REQUEST_PICK_ELF && requestCode != REQUEST_PICK_ROOTFS && requestCode != REQUEST_PICK_TERMINAL_ELF)
                 || resultCode != RESULT_OK || data == null) {
             return;
         }
@@ -656,7 +800,34 @@ public class MainActivity extends AppCompatActivity {
             } catch (Exception error) {
                 Toast.makeText(this, "Could not save access to this folder.", Toast.LENGTH_LONG).show();
             }
-            showScreen(R.id.nav_apps);
+            boolean returnToTerminal = getPreferences().getBoolean(PREF_ROOTFS_RETURN_TERMINAL, false);
+            getPreferences().edit().remove(PREF_ROOTFS_RETURN_TERMINAL).apply();
+            showScreen(returnToTerminal ? R.id.nav_terminal : R.id.nav_apps);
+            return;
+        }
+
+        if (requestCode == REQUEST_PICK_TERMINAL_ELF) {
+            String name = queryDisplayName(uri);
+            if (!isArm64TerminalElf(uri, name)) {
+                Toast.makeText(this,
+                        "Rejected: choose an ELF64 little-endian AArch64 shell named sh, ash, bash, BusyBox, dash or zsh.",
+                        Toast.LENGTH_LONG).show();
+                showScreen(R.id.nav_terminal);
+                return;
+            }
+            int flags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+            try {
+                getContentResolver().takePersistableUriPermission(uri, flags);
+            } catch (Exception ignored) {
+                // Some document providers grant temporary access only.
+            }
+            getPreferences().edit()
+                    .putString(PREF_TERMINAL_ELF_URI, uri.toString())
+                    .putString(PREF_TERMINAL_ELF_NAME, name)
+                    .apply();
+            Toast.makeText(this, "ARM64 terminal ELF accepted.", Toast.LENGTH_SHORT).show();
+            showScreen(R.id.nav_terminal);
             return;
         }
 

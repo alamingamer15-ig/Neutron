@@ -40,7 +40,7 @@ jobs:
 
       - name: Configure
         run: |
-          cp rootfs/buildroot/neutron_x86_64_glibc_defconfig /tmp/buildroot-src/.config
+          cp rootfs/buildroot/neutron_aarch64_glibc_defconfig /tmp/buildroot-src/.config
           sudo install -m 0755 rootfs/buildroot/post-build.sh /tmp/neutron-post-build.sh
           make -C /tmp/buildroot-src olddefconfig
 
@@ -52,21 +52,23 @@ jobs:
       - name: Package and checksum
         run: |
           mkdir -p rootfs/images
-          cp /tmp/buildroot-src/output/images/rootfs.tar.gz rootfs/images/neutron-x86_64-glibc.tar.gz
+          cp /tmp/buildroot-src/output/images/rootfs.tar.gz rootfs/images/neutron-aarch64-glibc.tar.gz
           cd rootfs/images
-          sha256sum neutron-x86_64-glibc.tar.gz > neutron-x86_64-glibc.tar.gz.sha256
-          ls -lh neutron-x86_64-glibc.tar.gz
-          tar -tzf neutron-x86_64-glibc.tar.gz | grep -E '^\./?(bin|lib|lib64|home|dev|proc)(/|$)' | head -30
-          tar -xOzf neutron-x86_64-glibc.tar.gz ./etc/neutron-rootfs-release
+          sha256sum neutron-aarch64-glibc.tar.gz > neutron-aarch64-glibc.tar.gz.sha256
+          ls -lh neutron-aarch64-glibc.tar.gz
+          tar -tzf neutron-aarch64-glibc.tar.gz | grep -E '^\./?(bin|lib|lib64|home|dev|proc)(/|$)' | head -30
+          tar -xOzf neutron-aarch64-glibc.tar.gz ./etc/neutron-rootfs-release
 
       - name: Commit rootfs archive to main
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add rootfs/images/neutron-x86_64-glibc.tar.gz rootfs/images/neutron-x86_64-glibc.tar.gz.sha256
+          git add rootfs/images/neutron-aarch64-glibc.tar.gz rootfs/images/neutron-aarch64-glibc.tar.gz.sha256
           if git diff --cached --quiet; then
             echo "Rootfs archive is already up to date."
             exit 0
           fi
-          git commit -m "Add minimal x86-64 glibc rootfs"
+          git commit -m "Add minimal AArch64 glibc rootfs"
+          git fetch origin main
+          git rebase origin/main
           git push origin HEAD:main
