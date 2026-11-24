@@ -46,8 +46,9 @@ public final class RootfsInstaller {
 
     public static boolean isInstalled(Context context) {
         File root = getRootfsDirectory(context);
-        boolean loader = new File(root, "lib64/ld-linux-aarch64.so.1").isFile()
-                || new File(root, "lib/ld-linux-aarch64.so.1").isFile();
+        File loaderFile = new File(root, "lib64/ld-linux-aarch64.so.1");
+        if (!loaderFile.isFile()) loaderFile = new File(root, "lib/ld-linux-aarch64.so.1");
+        boolean loader = isAarch64Elf(loaderFile);
         return new File(root, "bin").isDirectory()
                 && new File(root, "lib").isDirectory()
                 && new File(root, "home").isDirectory()

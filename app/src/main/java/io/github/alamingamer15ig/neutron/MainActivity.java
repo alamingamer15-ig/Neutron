@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.InputStream;
 
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.appbar.MaterialToolbar;
@@ -364,7 +365,12 @@ public class MainActivity extends AppCompatActivity {
         content.addView(rootfsCard, rootfsCardParams);
 
         MaterialButton chooseShell = button("Choose terminal ELF binary");
-        chooseShell.setOnClickListener(v -> chooseTerminalElf());
+        chooseShell.setEnabled(isRootfsValid());
+        chooseShell.setAlpha(chooseShell.isEnabled() ? 1.0f : 0.45f);
+        chooseShell.setOnClickListener(v -> {
+            if (isRootfsValid()) chooseTerminalElf();
+            else Toast.makeText(this, "Choose a valid ARM64 rootfs first.", Toast.LENGTH_SHORT).show();
+        });
         LinearLayout.LayoutParams chooseShellParams = params(-1, -2);
         chooseShellParams.topMargin = dp(16);
         content.addView(chooseShell, chooseShellParams);
@@ -675,14 +681,19 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
             if (!missing.isEmpty()) return false;
-            return hasChildDocument(treeUri, rootDocumentId, "lib", "ld-linux-aarch64.so.1")
-                    || hasChildDocument(treeUri, rootDocumentId, "lib64", "ld-linux-aarch64.so.1");
+            Uri busybox = findChildDocumentUri(treeUri, rootDocumentId, "bin", "busybox");
+            Uri loader = findChildDocumentUri(treeUri, rootDocumentId, "lib", "ld-linux-aarch64.so.1");
+            if (loader == null) {
+                loader = findChildDocumentUri(treeUri, rootDocumentId, "lib64", "ld-linux-aarch64.so.1");
+            }
+            return busybox != null && loader != null
+                    && isArm64ElfUri(busybox) && isArm64ElfUri(loader);
         } catch (Exception ignored) {
             return false;
         }
     }
 
-    private boolean hasChildDocument(Uri treeUri, String parentId, String directory, String fileName) {
+    private Uri findChildDocumentUri(Uri treeUri, String parentId, String directory, String fileName) {
         try {
             Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId);
             String directoryId = null;
@@ -690,7 +701,7 @@ public class MainActivity extends AppCompatActivity {
                     new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID,
                             DocumentsContract.Document.COLUMN_DISPLAY_NAME,
                             DocumentsContract.Document.COLUMN_MIME_TYPE}, null, null, null)) {
-                if (cursor == null) return false;
+                if (cursor == null) return null;
                 while (cursor.moveToNext()) {
                     if (directory.equals(cursor.getString(1))
                             && DocumentsContract.Document.MIME_TYPE_DIR.equals(cursor.getString(2))) {
@@ -699,19 +710,44 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             }
-            if (directoryId == null) return false;
+            if (directoryId == null) return null;
             Uri nested = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, directoryId);
             try (Cursor cursor = getContentResolver().query(nested,
-                    new String[]{DocumentsContract.Document.COLUMN_DISPLAY_NAME}, null, null, null)) {
-                if (cursor == null) return false;
+                    new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                            DocumentsContract.Document.COLUMN_DISPLAY_NAME}, null, null, null)) {
+                if (cursor == null) return null;
                 while (cursor.moveToNext()) {
-                    if (fileName.equals(cursor.getString(0))) return true;
+                    if (fileName.equals(cursor.getString(1))) {
+                        return DocumentsContract.buildDocumentUriUsingTree(treeUri, cursor.getString(0));
+                    }
                 }
             }
         } catch (Exception ignored) {
+            return null;
+        }
+        return null;
+    }
+
+    private boolean isArm64ElfUri(Uri uri) {
+        try (InputStream input = "file".equals(uri.getScheme())
+                ? new java.io.FileInputStream(uri.getPath())
+                : getContentResolver().openInputStream(uri)) {
+            if (input == null) return false;
+            byte[] header = new byte[20];
+            int offset = 0;
+            while (offset < header.length) {
+                int count = input.read(header, offset, header.length - offset);
+                if (count < 0) return false;
+                offset += count;
+            }
+            int type = (header[16] & 0xff) | ((header[17] & 0xff) << 8);
+            int machine = (header[18] & 0xff) | ((header[19] & 0xff) << 8);
+            return header[0] == 0x7f && header[1] == 'E' && header[2] == 'L'
+                    && header[3] == 'F' && header[4] == 2 && header[5] == 1
+                    && (type == 2 || type == 3) && machine == 183;
+        } catch (Exception ignored) {
             return false;
         }
-        return false;
     }
 
     private String getRootfsStatus() {
@@ -734,10 +770,32 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void chooseTerminalElf() {
+        if (RootfsInstaller.isInstalled(this)) {
+            File busybox = new File(RootfsInstaller.getRootfsDirectory(this), "bin/busybox");
+            Uri uri = Uri.fromFile(busybox);
+            if (isArm64TerminalElf(uri, "busybox")) {
+                new AlertDialog.Builder(this)
+                        .setTitle("Choose terminal binary")
+                        .setItems(new String[]{"/bin/busybox (shell applet)"}, (dialog, which) ->
+                                saveTerminalElf(uri, "/bin/busybox"))
+                        .setNegativeButton("Cancel", null)
+                        .show();
+                return;
+            }
+        }
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("*/*");
         startActivityForResult(intent, REQUEST_PICK_TERMINAL_ELF);
+    }
+
+    private void saveTerminalElf(Uri uri, String name) {
+        getPreferences().edit()
+                .putString(PREF_TERMINAL_ELF_URI, uri.toString())
+                .putString(PREF_TERMINAL_ELF_NAME, name)
+                .apply();
+        Toast.makeText(this, "ARM64 terminal ELF accepted.", Toast.LENGTH_SHORT).show();
+        showScreen(R.id.nav_terminal);
     }
 
     private boolean isArm64TerminalElf(Uri uri, String name) {
@@ -745,7 +803,9 @@ public class MainActivity extends AppCompatActivity {
         boolean shellName = lower.equals("sh") || lower.equals("ash") || lower.equals("bash")
                 || lower.equals("busybox") || lower.equals("dash") || lower.equals("zsh");
         if (!shellName) return false;
-        try (InputStream input = getContentResolver().openInputStream(uri)) {
+        try (InputStream input = "file".equals(uri.getScheme())
+                ? new java.io.FileInputStream(uri.getPath())
+                : getContentResolver().openInputStream(uri)) {
             if (input == null) return false;
             byte[] header = new byte[20];
             int offset = 0;
@@ -789,7 +849,11 @@ public class MainActivity extends AppCompatActivity {
                     | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
             try {
                 getContentResolver().takePersistableUriPermission(uri, flags);
-                getPreferences().edit().putString(PREF_ROOTFS_URI, uri.toString()).apply();
+                getPreferences().edit()
+                        .putString(PREF_ROOTFS_URI, uri.toString())
+                        .remove(PREF_TERMINAL_ELF_URI)
+                        .remove(PREF_TERMINAL_ELF_NAME)
+                        .apply();
                 if (isRootfsValid()) {
                     Toast.makeText(this, "Rootfs validated.", Toast.LENGTH_SHORT).show();
                 } else {
@@ -816,18 +880,13 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
             int flags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
             try {
                 getContentResolver().takePersistableUriPermission(uri, flags);
             } catch (Exception ignored) {
                 // Some document providers grant temporary access only.
             }
-            getPreferences().edit()
-                    .putString(PREF_TERMINAL_ELF_URI, uri.toString())
-                    .putString(PREF_TERMINAL_ELF_NAME, name)
-                    .apply();
-            Toast.makeText(this, "ARM64 terminal ELF accepted.", Toast.LENGTH_SHORT).show();
-            showScreen(R.id.nav_terminal);
+            saveTerminalElf(uri, name);
             return;
         }
 
