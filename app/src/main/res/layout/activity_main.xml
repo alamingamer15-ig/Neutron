@@ -27,8 +27,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/neutron_surface"
-        app:itemIconTint="@color/neutron_primary"
-        app:itemTextColor="@color/neutron_muted"
+        app:itemIconTint="@color/nav_item_tint"
+        app:itemTextColor="@color/nav_text_tint"
         app:labelVisibilityMode="labeled"
         app:menu="@menu/bottom_navigation" />
 </LinearLayout>
