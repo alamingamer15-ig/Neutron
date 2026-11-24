@@ -79,6 +79,18 @@ DBT is the initial execution strategy.
 
 The guest CPU model must account for general-purpose registers, flags, control flow, and supported floating-point/SIMD state. x87 and SSE support are foundational; additional SIMD extensions are introduced progressively according to tested host support and correct emulation/translation behavior. AVX-family support must not be advertised until state management and instruction semantics are implemented and tested.
 
+### Virtual CPU count limits
+
+- Configurable guest virtual CPU count: **1–4 vCPUs**.
+- Default guest virtual CPU count: **4 vCPUs**.
+- Four is the maximum guest vCPU count for the initial architecture baseline; configurations requesting fewer cores are valid.
+- The selected count is a guest-visible scheduling limit, not a reservation of physical Android CPU cores.
+- Neutron must never schedule more than the configured number of guest vCPUs concurrently.
+- Host resource availability, Android scheduling behavior, battery policy, and thermal pressure may reduce actual parallel execution below the configured count; they must not silently increase the guest-visible vCPU count.
+- Per-application overrides may select a count within the same 1–4 range.
+- Changing the configured count takes effect when the guest is next started; changing it must not mutate the register state or identity of already-running vCPUs.
+- The implementation must validate the range at configuration load and guest startup, rejecting invalid values rather than silently clamping them.
+
 ## 4. Guest process and memory model
 
 - One active guest application at a time.
