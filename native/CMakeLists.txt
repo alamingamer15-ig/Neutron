@@ -32,6 +32,7 @@ FetchContent_MakeAvailable(zydis)
 
 add_library(neutron_native SHARED
     src/zydis_decoder.cpp
+    src/logging/logger.cpp
     src/neutron_jni.cpp
 )
 
