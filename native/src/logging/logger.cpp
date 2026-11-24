@@ -98,14 +98,15 @@ std::string FormatLine(Level level, std::string_view tag, std::string_view messa
 
 bool Logger::Initialize(const Config& config) {
     std::lock_guard<std::mutex> lock(g_mutex);
-
-    if (config.directory.empty() || config.max_file_bytes == 0) {
-        return false;
-    }
+    g_initialized = false;
 
     if (g_stream.is_open()) {
         g_stream.flush();
         g_stream.close();
+    }
+
+    if (config.directory.empty() || config.max_file_bytes == 0) {
+        return false;
     }
 
     g_directory = config.directory;
@@ -152,8 +153,10 @@ void Logger::Write(Level level, std::string_view tag, std::string_view message) 
         return;
     }
 
-    if (level == Level::Fatal) {
-        g_stream.flush();
+    // Flush each record so normal app termination does not discard buffered logs.
+    g_stream.flush();
+    if (!g_stream) {
+        g_initialized = false;
     }
 }
 
