@@ -18,6 +18,7 @@ import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
+import java.io.File;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -488,10 +489,16 @@ public class MainActivity extends AppCompatActivity {
         statusParams.topMargin = dp(5);
         body.addView(status, statusParams);
 
-        MaterialButton chooseRootfs = button("Choose rootfs folder");
+        MaterialButton installAlpine = button("Install Alpine Linux (x86-64)");
+        installAlpine.setOnClickListener(v -> installAlpineRootfs(status, installAlpine));
+        LinearLayout.LayoutParams installParams = params(-1, -2);
+        installParams.topMargin = dp(12);
+        body.addView(installAlpine, installParams);
+
+        MaterialButton chooseRootfs = button("Choose existing rootfs folder");
         chooseRootfs.setOnClickListener(v -> chooseRootfsFolder());
         LinearLayout.LayoutParams buttonParams = params(-1, -2);
-        buttonParams.topMargin = dp(12);
+        buttonParams.topMargin = dp(8);
         body.addView(chooseRootfs, buttonParams);
 
         MaterialCardView rootfsCard = card();
@@ -499,6 +506,32 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout.LayoutParams cardParams = params(-1, -2);
         cardParams.topMargin = dp(18);
         parent.addView(rootfsCard, cardParams);
+    }
+
+    private void installAlpineRootfs(TextView status, MaterialButton installButton) {
+        installButton.setEnabled(false);
+        status.setText("Downloading Alpine minirootfs…");
+        new Thread(() -> {
+            try {
+                File installed = RootfsInstaller.install(this, percent ->
+                        runOnUiThread(() -> status.setText(
+                                percent < 0 ? "Extracting Alpine rootfs…" :
+                                        "Downloading Alpine rootfs… " + percent + "%")));
+                runOnUiThread(() -> {
+                    status.setText("Alpine Linux 3.24.4 · x86-64 · installed in app storage");
+                    installButton.setText("Reinstall Alpine Linux");
+                    installButton.setEnabled(true);
+                    Toast.makeText(this, "Alpine rootfs installed.", Toast.LENGTH_LONG).show();
+                    showScreen(R.id.nav_apps);
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> {
+                    status.setText("Installation failed: " + error.getMessage());
+                    installButton.setEnabled(true);
+                    Toast.makeText(this, "Alpine installation failed.", Toast.LENGTH_LONG).show();
+                });
+            }
+        }, "neutron-rootfs-installer").start();
     }
 
     private void chooseRootfsFolder() {
@@ -511,6 +544,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private boolean isRootfsValid() {
+        if (RootfsInstaller.isInstalled(this)) {
+            return true;
+        }
         Uri treeUri = getSavedRootfsUri();
         if (treeUri == null) {
             return false;
@@ -566,6 +602,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private String getRootfsStatus() {
+        if (RootfsInstaller.isInstalled(this)) {
+            return "Alpine Linux 3.24.4 · x86-64 · app-private storage";
+        }
         if (getSavedRootfsUri() == null) {
             return "No rootfs selected. Launch is disabled.";
         }
