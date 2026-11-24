@@ -1,0 +1,12 @@
+<resources>
+    <style name="Theme.Neutron" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/neutron_primary</item>
+        <item name="colorOnPrimary">@color/neutron_on_primary</item>
+        <item name="android:colorAccent">@color/neutron_primary</item>
+        <item name="android:windowBackground">@color/neutron_background</item>
+        <item name="android:navigationBarColor">@color/neutron_background</item>
+        <item name="android:statusBarColor">@color/neutron_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:fontFamily">sans</item>
+    </style>
+</resources>
