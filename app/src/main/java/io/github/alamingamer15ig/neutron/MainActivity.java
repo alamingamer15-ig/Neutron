@@ -13,6 +13,7 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.SeekBar;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
@@ -32,6 +33,11 @@ public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_PICK_ELF = 41;
     private static final String PREFS = "neutron_ui";
     private static final String PREF_SELECTED_FILES = "selected_files";
+    private static final String PREF_GUEST_RAM_MB = "guest_ram_limit_mb";
+    private static final int DEFAULT_GUEST_RAM_MB = 512;
+    private static final int MIN_GUEST_RAM_MB = 256;
+    private static final int MAX_GUEST_RAM_MB = 2048;
+    private static final int RAM_STEP_MB = 128;
 
     private FrameLayout contentContainer;
     private BottomNavigationView bottomNavigation;
@@ -336,7 +342,7 @@ public class MainActivity extends AppCompatActivity {
         content.addView(subtitle, subtitleParams);
 
         addSettingsCard(content, "Performance", "CPU workers", "Translation and execution worker limits will be configurable here.");
-        addSettingsCard(content, "Memory", "Guest RAM and cache", "Set guest memory, translation cache RAM and persistent cache limits.");
+        addMemoryLimiterCard(content);
         addSettingsCard(content, "Graphics", "Vulkan and OpenGL", "Choose rendering mode, display resolution and frame-rate limits.");
         addSettingsCard(content, "Audio & input", "Devices and controls", "Configure audio output, touch controls, keyboard, mouse and gamepads.");
         addSettingsCard(content, "Storage", "Root filesystem", "Manage the Linux root filesystem, shared folders and package storage.");
@@ -348,6 +354,77 @@ public class MainActivity extends AppCompatActivity {
         versionParams.topMargin = dp(24);
         content.addView(version, versionParams);
         return page;
+    }
+
+    private void addMemoryLimiterCard(LinearLayout parent) {
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(16), dp(15), dp(16), dp(15));
+
+        body.addView(text("MEMORY", 10, R.color.neutron_primary, true));
+
+        TextView heading = text("Guest RAM limit", 16, R.color.neutron_text, true);
+        LinearLayout.LayoutParams headingParams = params(-1, -2);
+        headingParams.topMargin = dp(6);
+        body.addView(heading, headingParams);
+
+        TextView value = text("", 24, R.color.neutron_text, true);
+        LinearLayout.LayoutParams valueParams = params(-1, -2);
+        valueParams.topMargin = dp(12);
+        body.addView(value, valueParams);
+
+        SeekBar limiter = new SeekBar(this);
+        limiter.setMax((MAX_GUEST_RAM_MB - MIN_GUEST_RAM_MB) / RAM_STEP_MB);
+        int savedLimit = getPreferences().getInt(PREF_GUEST_RAM_MB, DEFAULT_GUEST_RAM_MB);
+        int initialLimit = Math.max(MIN_GUEST_RAM_MB,
+                Math.min(MAX_GUEST_RAM_MB, savedLimit));
+        int initialProgress = Math.round((initialLimit - MIN_GUEST_RAM_MB) / (float) RAM_STEP_MB);
+        limiter.setProgress(initialProgress);
+        value.setText(initialLimit + " MB");
+
+        LinearLayout.LayoutParams seekParams = params(-1, -2);
+        seekParams.topMargin = dp(4);
+        body.addView(limiter, seekParams);
+
+        LinearLayout range = new LinearLayout(this);
+        range.setGravity(Gravity.CENTER_VERTICAL);
+        TextView minimum = text(MIN_GUEST_RAM_MB + " MB", 11, R.color.neutron_muted, false);
+        TextView maximum = text(MAX_GUEST_RAM_MB + " MB", 11, R.color.neutron_muted, false);
+        range.addView(minimum, new LinearLayout.LayoutParams(0, -2, 1));
+        maximum.setGravity(Gravity.END);
+        range.addView(maximum);
+        body.addView(range);
+
+        TextView detail = text("Maximum memory available to the Linux guest. This preference is saved locally; enforcement will activate when the runtime memory manager is implemented.",
+                12, R.color.neutron_muted, false);
+        LinearLayout.LayoutParams detailParams = params(-1, -2);
+        detailParams.topMargin = dp(12);
+        body.addView(detail, detailParams);
+
+        limiter.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                int limitMb = MIN_GUEST_RAM_MB + progress * RAM_STEP_MB;
+                value.setText(limitMb + " MB");
+                if (fromUser) {
+                    getPreferences().edit().putInt(PREF_GUEST_RAM_MB, limitMb).apply();
+                }
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+            }
+        });
+
+        MaterialCardView card = card();
+        card.addView(body);
+        LinearLayout.LayoutParams cardParams = params(-1, -2);
+        cardParams.topMargin = dp(11);
+        parent.addView(card, cardParams);
     }
 
     private void addSettingsCard(LinearLayout parent, String category, String title, String description) {
