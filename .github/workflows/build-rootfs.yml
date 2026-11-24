@@ -1,0 +1,72 @@
+name: Build minimal glibc rootfs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-rootfs.yml"
+      - "rootfs/buildroot/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: neutron-rootfs-main
+  cancel-in-progress: false
+
+jobs:
+  build-rootfs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Install Buildroot host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential gcc g++ make \
+            libncurses-dev wget cpio unzip rsync bc file python3 perl git
+
+      - name: Download Buildroot 2026.08.2
+        run: |
+          curl -fL --retry 3 https://buildroot.org/downloads/buildroot-2026.08.2.tar.gz -o /tmp/buildroot.tar.gz
+          mkdir -p /tmp/buildroot-src
+          tar -xzf /tmp/buildroot.tar.gz -C /tmp/buildroot-src --strip-components=1
+
+      - name: Configure
+        run: |
+          cp rootfs/buildroot/neutron_x86_64_glibc_defconfig /tmp/buildroot-src/.config
+          sudo install -m 0755 rootfs/buildroot/post-build.sh /tmp/neutron-post-build.sh
+          make -C /tmp/buildroot-src olddefconfig
+
+      - name: Build root filesystem
+        run: |
+          make -C /tmp/buildroot-src -j2
+          test -s /tmp/buildroot-src/output/images/rootfs.tar.gz
+
+      - name: Package and checksum
+        run: |
+          mkdir -p rootfs/images
+          cp /tmp/buildroot-src/output/images/rootfs.tar.gz rootfs/images/neutron-x86_64-glibc.tar.gz
+          cd rootfs/images
+          sha256sum neutron-x86_64-glibc.tar.gz > neutron-x86_64-glibc.tar.gz.sha256
+          ls -lh neutron-x86_64-glibc.tar.gz
+          tar -tzf neutron-x86_64-glibc.tar.gz | grep -E '^\./?(bin|lib|lib64|home|dev|proc)(/|$)' | head -30
+          tar -xOzf neutron-x86_64-glibc.tar.gz ./etc/neutron-rootfs-release
+
+      - name: Commit rootfs archive to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add rootfs/images/neutron-x86_64-glibc.tar.gz rootfs/images/neutron-x86_64-glibc.tar.gz.sha256
+          if git diff --cached --quiet; then
+            echo "Rootfs archive is already up to date."
+            exit 0
+          fi
+          git commit -m "Add minimal x86-64 glibc rootfs"
+          git push origin HEAD:main

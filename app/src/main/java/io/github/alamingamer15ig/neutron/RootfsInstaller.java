@@ -24,12 +24,11 @@ import java.util.Locale;
 import java.util.stream.Stream;
 
 public final class RootfsInstaller {
-    private static final String VERSION = "3.24.4";
+    private static final String ROOTFS_ARCHIVE = "neutron-x86_64-glibc.tar.gz";
     private static final String BASE_URL =
-            "https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/";
-    private static final String ARCHIVE =
-            "alpine-minirootfs-" + VERSION + "-x86_64.tar.gz";
-    private static final long MAX_DOWNLOAD_BYTES = 32L * 1024L * 1024L;
+            "https://raw.githubusercontent.com/alamingamer15-ig/Neutron/main/rootfs/images/";
+    
+    private static final long MAX_DOWNLOAD_BYTES = 64L * 1024L * 1024L;
     private static final long MAX_EXTRACTED_BYTES = 256L * 1024L * 1024L;
     private static final int MAX_ENTRIES = 50000;
 
@@ -42,17 +41,20 @@ public final class RootfsInstaller {
     }
 
     public static File getRootfsDirectory(Context context) {
-        return new File(context.getFilesDir(), "rootfs/alpine-x86_64");
+        return new File(context.getFilesDir(), "rootfs/neutron-x86_64-glibc");
     }
 
     public static boolean isInstalled(Context context) {
         File root = getRootfsDirectory(context);
+        boolean loader = new File(root, "lib64/ld-linux-x86-64.so.2").isFile()
+                || new File(root, "lib/ld-linux-x86-64.so.2").isFile();
         return new File(root, "bin").isDirectory()
                 && new File(root, "lib").isDirectory()
                 && new File(root, "home").isDirectory()
                 && new File(root, "dev").isDirectory()
                 && new File(root, "proc").isDirectory()
-                && new File(root, "etc/alpine-release").isFile();
+                && new File(root, "etc/neutron-rootfs-release").isFile()
+                && loader;
     }
 
     public static File install(Context context, ProgressListener listener) throws Exception {
@@ -65,27 +67,22 @@ public final class RootfsInstaller {
         if (!work.exists() && !work.mkdirs()) {
             throw new IllegalStateException("Cannot create installer workspace");
         }
-        File archive = new File(work, ARCHIVE + ".part");
-        File staging = new File(root.getParentFile(), "alpine-x86_64.installing");
+        File archive = new File(work, ROOTFS_ARCHIVE + ".part");
+        File staging = new File(root.getParentFile(), "neutron-x86_64-glibc.installing");
         deleteRecursively(staging.toPath());
 
-        String expectedHash = readExpectedHash(new URL(BASE_URL + ARCHIVE + ".sha256"));
-        download(new URL(BASE_URL + ARCHIVE), archive, listener);
+        String expectedHash = readExpectedHash(new URL(BASE_URL + ROOTFS_ARCHIVE + ".sha256"));
+        download(new URL(BASE_URL + ROOTFS_ARCHIVE), archive, listener);
         String actualHash = sha256(archive);
         if (!actualHash.equalsIgnoreCase(expectedHash)) {
-            throw new SecurityException("Alpine archive SHA-256 verification failed");
+            throw new SecurityException("Neutron rootfs SHA-256 verification failed");
         }
 
         if (listener != null) {
             listener.onProgress(-1);
         }
         extractArchive(archive, staging);
-        ensureRequiredDirectories(staging);
-        if (!new File(staging, "etc/alpine-release").isFile()) {
-            throw new IllegalStateException("Downloaded archive is not an Alpine rootfs");
-        }
-
-        File parent = root.getParentFile();
+File parent = root.getParentFile();
         if (!parent.exists() && !parent.mkdirs()) {
             throw new IllegalStateException("Cannot create rootfs storage");
         }
@@ -96,7 +93,7 @@ public final class RootfsInstaller {
         archive.delete();
 
         if (!isInstalled(context)) {
-            throw new IllegalStateException("Installed rootfs failed validation");
+            throw new IllegalStateException("Rootfs failed glibc validation");
         }
         return root;
     }
@@ -171,7 +168,7 @@ public final class RootfsInstaller {
         int code = connection.getResponseCode();
         if (code < 200 || code >= 300) {
             connection.disconnect();
-            throw new IllegalStateException("Alpine server returned HTTP " + code);
+            throw new IllegalStateException("Rootfs server returned HTTP " + code);
         }
         return connection;
     }
@@ -257,19 +254,6 @@ public final class RootfsInstaller {
                     output.toFile().setExecutable((mode & 0111) != 0, false);
                 }
                 // Device nodes and FIFOs are intentionally not created on Android.
-            }
-        }
-    }
-
-    private static void ensureRequiredDirectories(File root) throws Exception {
-        String[] names = {"bin", "lib", "home", "dev", "proc"};
-        for (String name : names) {
-            File directory = new File(root, name);
-            if (!directory.exists() && !directory.mkdirs()) {
-                throw new IllegalStateException("Could not create /" + name);
-            }
-            if (!directory.isDirectory()) {
-                throw new IllegalStateException("Rootfs /" + name + " is not a directory");
             }
         }
     }

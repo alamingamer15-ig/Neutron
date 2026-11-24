@@ -489,7 +489,7 @@ public class MainActivity extends AppCompatActivity {
         statusParams.topMargin = dp(5);
         body.addView(status, statusParams);
 
-        MaterialButton installAlpine = button("Install Alpine Linux (x86-64)");
+        MaterialButton installAlpine = button("Install Neutron glibc rootfs (x86-64)");
         installAlpine.setOnClickListener(v -> installAlpineRootfs(status, installAlpine));
         LinearLayout.LayoutParams installParams = params(-1, -2);
         installParams.topMargin = dp(12);
@@ -510,25 +510,25 @@ public class MainActivity extends AppCompatActivity {
 
     private void installAlpineRootfs(TextView status, MaterialButton installButton) {
         installButton.setEnabled(false);
-        status.setText("Downloading Alpine minirootfs…");
+        status.setText("Downloading Neutron glibc rootfs…");
         new Thread(() -> {
             try {
                 File installed = RootfsInstaller.install(this, percent ->
                         runOnUiThread(() -> status.setText(
-                                percent < 0 ? "Extracting Alpine rootfs…" :
-                                        "Downloading Alpine rootfs… " + percent + "%")));
+                                percent < 0 ? "Extracting glibc rootfs…" :
+                                        "Downloading glibc rootfs… " + percent + "%")));
                 runOnUiThread(() -> {
-                    status.setText("Alpine Linux 3.24.4 · x86-64 · installed in app storage");
-                    installButton.setText("Reinstall Alpine Linux");
+                    status.setText("Neutron minimal glibc · x86-64 · installed in app storage");
+                    installButton.setText("Reinstall glibc rootfs");
                     installButton.setEnabled(true);
-                    Toast.makeText(this, "Alpine rootfs installed.", Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "Neutron glibc rootfs installed.", Toast.LENGTH_LONG).show();
                     showScreen(R.id.nav_apps);
                 });
             } catch (Exception error) {
                 runOnUiThread(() -> {
                     status.setText("Installation failed: " + error.getMessage());
                     installButton.setEnabled(true);
-                    Toast.makeText(this, "Alpine installation failed.", Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "Rootfs installation failed.", Toast.LENGTH_LONG).show();
                 });
             }
         }, "neutron-rootfs-installer").start();
@@ -603,7 +603,7 @@ public class MainActivity extends AppCompatActivity {
 
     private String getRootfsStatus() {
         if (RootfsInstaller.isInstalled(this)) {
-            return "Alpine Linux 3.24.4 · x86-64 · app-private storage";
+            return "Neutron minimal glibc · x86-64 · app-private storage";
         }
         if (getSavedRootfsUri() == null) {
             return "No rootfs selected. Launch is disabled.";
