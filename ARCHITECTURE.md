@@ -47,8 +47,8 @@ DBT is the initial execution strategy.
 
 1. Load and validate an x86-64 ELF object.
 2. Map guest segments into the guest address-space model.
-3. Decode x86-64 instructions into basic blocks.
-4. Convert decoded instructions into a custom, architecture-neutral IR.
+3. Decode x86-64 instructions into basic blocks using **Zydis** (external decoder dependency).
+4. Convert Zydis instruction details into Neutron's custom, architecture-neutral IR.
 5. Generate AArch64 machine code.
 6. Store generated code in the translation cache.
 7. Execute translated blocks on native ARM64 threads.
@@ -60,7 +60,9 @@ DBT is the initial execution strategy.
 - Translation and execution use separate configurable worker pools that share an overall CPU budget.
 - Workers should sleep when idle; thermal and battery policies may reduce concurrency.
 - Runtime optimization can be disabled by the user.
-- The decoder, IR, and code generator must have explicit feature boundaries and tests.
+- Use Zydis for x86-64 instruction decoding; Neutron owns instruction-to-IR lowering, IR semantics, optimization, and AArch64 code generation.
+- Pin a stable Zydis release and track its required license notices. Use the decoder API, not Zydis as Neutron's translator or AArch64 code generator.
+- The Zydis adapter, IR, and code generator must have explicit feature boundaries and tests.
 
 ### Cache
 
@@ -208,7 +210,7 @@ The exact PulseAudio-compatible server/bridge design, stream formats, mixing, an
 The following require prototypes, tests, or explicit decisions before they can be considered settled:
 
 1. Guest libc and dynamic-linker strategy (glibc, musl, or a deliberately separated compatibility arrangement).
-2. Exact x86-64 decoder and IR design, including licensing and maintenance.
+2. Exact IR design, instruction-to-IR lowering rules, and unsupported-instruction behavior.
 3. Guest virtual-address layout and safe executable-memory strategy on Android.
 4. Complete syscall support matrix and signal/futex semantics.
 5. Self-modifying-code detection and translation-cache invalidation.
