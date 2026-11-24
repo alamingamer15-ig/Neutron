@@ -2,7 +2,9 @@ package io.github.alamingamer15ig.neutron;
 
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.ContentResolver;
 import android.database.Cursor;
+import android.provider.DocumentsContract;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
@@ -15,6 +17,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -31,8 +34,10 @@ import java.util.Set;
 
 public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_PICK_ELF = 41;
+    private static final int REQUEST_PICK_ROOTFS = 42;
     private static final String PREFS = "neutron_ui";
     private static final String PREF_SELECTED_FILES = "selected_files";
+    private static final String PREF_ROOTFS_URI = "rootfs_tree_uri";
     private static final String PREF_GUEST_RAM_MB = "guest_ram_limit_mb";
     private static final int DEFAULT_GUEST_RAM_MB = 512;
     private static final int MIN_GUEST_RAM_MB = 256;
@@ -231,6 +236,8 @@ public class MainActivity extends AppCompatActivity {
         subtitleParams.topMargin = dp(6);
         content.addView(subtitle, subtitleParams);
 
+        addRootfsCard(content);
+
         MaterialButton chooseButton = button("Choose an ELF file");
         chooseButton.setIconResource(android.R.drawable.ic_menu_add);
         chooseButton.setOnClickListener(v -> chooseElfFile());
@@ -280,6 +287,22 @@ public class MainActivity extends AppCompatActivity {
                 pendingParams.topMargin = dp(3);
                 details.addView(pending, pendingParams);
                 row.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
+
+                MaterialButton launchButton = button("Launch");
+                launchButton.setMinWidth(dp(76));
+                launchButton.setEnabled(isRootfsValid());
+                launchButton.setAlpha(launchButton.isEnabled() ? 1.0f : 0.45f);
+                launchButton.setOnClickListener(v -> {
+                    if (!isRootfsValid()) {
+                        Toast.makeText(this, "Select a valid rootfs first.", Toast.LENGTH_SHORT).show();
+                        showScreen(R.id.nav_apps);
+                        return;
+                    }
+                    Toast.makeText(this,
+                            "Rootfs validated. Guest execution is not implemented yet.",
+                            Toast.LENGTH_LONG).show();
+                });
+                row.addView(launchButton);
                 fileCard.addView(row);
                 LinearLayout.LayoutParams fileParams = params(-1, -2);
                 fileParams.topMargin = dp(9);
@@ -447,6 +470,117 @@ public class MainActivity extends AppCompatActivity {
         parent.addView(card, cardParams);
     }
 
+
+    private void addRootfsCard(LinearLayout parent) {
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(16), dp(15), dp(16), dp(15));
+        body.addView(text("LINUX ENVIRONMENT", 10, R.color.neutron_primary, true));
+
+        TextView heading = text("Root filesystem", 16, R.color.neutron_text, true);
+        LinearLayout.LayoutParams headingParams = params(-1, -2);
+        headingParams.topMargin = dp(6);
+        body.addView(heading, headingParams);
+
+        TextView status = text(getRootfsStatus(), 12,
+                isRootfsValid() ? R.color.neutron_primary : R.color.neutron_muted, false);
+        LinearLayout.LayoutParams statusParams = params(-1, -2);
+        statusParams.topMargin = dp(5);
+        body.addView(status, statusParams);
+
+        MaterialButton chooseRootfs = button("Choose rootfs folder");
+        chooseRootfs.setOnClickListener(v -> chooseRootfsFolder());
+        LinearLayout.LayoutParams buttonParams = params(-1, -2);
+        buttonParams.topMargin = dp(12);
+        body.addView(chooseRootfs, buttonParams);
+
+        MaterialCardView rootfsCard = card();
+        rootfsCard.addView(body);
+        LinearLayout.LayoutParams cardParams = params(-1, -2);
+        cardParams.topMargin = dp(18);
+        parent.addView(rootfsCard, cardParams);
+    }
+
+    private void chooseRootfsFolder() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
+        startActivityForResult(intent, REQUEST_PICK_ROOTFS);
+    }
+
+    private boolean isRootfsValid() {
+        Uri treeUri = getSavedRootfsUri();
+        if (treeUri == null) {
+            return false;
+        }
+
+        Set<String> missing = new HashSet<>();
+        Collections.addAll(missing, "bin", "lib", "home", "dev", "proc");
+
+        try {
+            ContentResolver resolver = getContentResolver();
+            String rootDocumentId = DocumentsContract.getTreeDocumentId(treeUri);
+            Uri rootDocumentUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, rootDocumentId);
+            String[] rootProjection = {DocumentsContract.Document.COLUMN_MIME_TYPE};
+            try (Cursor rootCursor = resolver.query(rootDocumentUri, rootProjection,
+                    null, null, null)) {
+                if (rootCursor == null || !rootCursor.moveToFirst()) {
+                    return false;
+                }
+                int mimeColumn = rootCursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE);
+                if (mimeColumn < 0 || !DocumentsContract.Document.MIME_TYPE_DIR.equals(
+                        rootCursor.getString(mimeColumn))) {
+                    return false;
+                }
+            }
+
+            Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, rootDocumentId);
+            String[] childProjection = {
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                    DocumentsContract.Document.COLUMN_MIME_TYPE
+            };
+            try (Cursor children = resolver.query(childrenUri, childProjection,
+                    null, null, null)) {
+                if (children == null) {
+                    return false;
+                }
+                int nameColumn = children.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME);
+                int typeColumn = children.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE);
+                if (nameColumn < 0 || typeColumn < 0) {
+                    return false;
+                }
+                while (children.moveToNext()) {
+                    String name = children.getString(nameColumn);
+                    String mime = children.getString(typeColumn);
+                    if (name != null && DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)) {
+                        missing.remove(name);
+                    }
+                }
+            }
+            return missing.isEmpty();
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private String getRootfsStatus() {
+        if (getSavedRootfsUri() == null) {
+            return "No rootfs selected. Launch is disabled.";
+        }
+        if (isRootfsValid()) {
+            return "Valid rootfs · /bin, /lib, /home, /dev and /proc found.";
+        }
+        return "Invalid or inaccessible rootfs. Required directories: /bin, /lib, /home, /dev and /proc.";
+    }
+
+    @Nullable
+    private Uri getSavedRootfsUri() {
+        String value = getPreferences().getString(PREF_ROOTFS_URI, null);
+        return value == null ? null : Uri.parse(value);
+    }
+
     private void chooseElfFile() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -463,6 +597,26 @@ public class MainActivity extends AppCompatActivity {
 
         Uri uri = data.getData();
         if (uri == null) {
+            return;
+        }
+
+        if (requestCode == REQUEST_PICK_ROOTFS) {
+            int flags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            try {
+                getContentResolver().takePersistableUriPermission(uri, flags);
+                getPreferences().edit().putString(PREF_ROOTFS_URI, uri.toString()).apply();
+                if (isRootfsValid()) {
+                    Toast.makeText(this, "Rootfs validated.", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(this,
+                            "Rootfs is missing one or more required directories.",
+                            Toast.LENGTH_LONG).show();
+                }
+            } catch (Exception error) {
+                Toast.makeText(this, "Could not save access to this folder.", Toast.LENGTH_LONG).show();
+            }
+            showScreen(R.id.nav_apps);
             return;
         }
 
