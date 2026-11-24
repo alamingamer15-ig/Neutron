@@ -4,7 +4,7 @@
 
 The project explores a Proton-inspired approach for Android: translate guest x86-64 code to native AArch64 code, provide a Linux userspace environment, and bridge guest application interfaces to Android's Linux kernel and graphics/audio/input systems.
 
-> **Status: early planning / pre-implementation.** Neutron is not yet a working compatibility layer. Compatibility, performance, and hardware support have not been demonstrated.
+> **Status: early prototype.** The first Android GUI shell is under development. The x86-64 translator, Linux root filesystem, syscall compatibility layer, and guest execution pipeline are not implemented yet.
 
 ## Project goals
 
@@ -26,15 +26,39 @@ The project explores a Proton-inspired approach for Android: translate guest x86
 
 Neutron aims for progressive compatibility. It does not promise that every Linux application, syscall, graphics feature, or distribution will work.
 
+## Android application
+
+The initial Android application uses Java, Android Views/XML, AndroidX AppCompat, and Material Components.
+
+- Application ID: `io.github.alamingamer15ig.neutron`
+- Minimum Android version: Android 8.0 (API 26)
+- Default appearance: dark
+- Main sections: Home, Applications, Terminal, and Settings
+- The Applications screen can record selected file names locally. It does not yet validate, copy, load, or execute ELF binaries.
+- The Terminal screen is a visual placeholder, not an active guest shell.
+- Runtime status and resource information are not connected to a native engine.
+
+### Build
+
+Open the repository in Android Studio and sync the Gradle project. Use JDK 17 and Android SDK platform 35.
+
+With Gradle 8.9 installed, a debug APK can be built with:
+
+```sh
+gradle assembleDebug
+```
+
+The APK output is normally:
+
+```
+app/build/outputs/apk/debug/app-debug.apk
+```
+
 ## Documentation
 
 - [Architecture specification](ARCHITECTURE.md)
 - [Contributing](CONTRIBUTING.md)
 - [License](LICENSE)
-
-## Current development state
-
-The repository currently documents the intended architecture. Implementation, supported-feature matrices, tests, benchmarks, and release builds will be added as the project develops.
 
 ## Naming
 

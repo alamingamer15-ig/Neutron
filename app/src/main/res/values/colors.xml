@@ -1,0 +1,11 @@
+<resources>
+    <color name="neutron_background">#11151D</color>
+    <color name="neutron_surface">#1B2230</color>
+    <color name="neutron_surface_variant">#252E3D</color>
+    <color name="neutron_primary">#A8C7FA</color>
+    <color name="neutron_on_primary">#10233F</color>
+    <color name="neutron_text">#E8EDF5</color>
+    <color name="neutron_muted">#A8B3C5</color>
+    <color name="neutron_outline">#354154</color>
+    <color name="neutron_success">#8BD5A8</color>
+</resources>

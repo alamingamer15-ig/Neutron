@@ -1,0 +1,474 @@
+package io.github.alamingamer15ig.neutron;
+
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.database.Cursor;
+import android.graphics.Typeface;
+import android.net.Uri;
+import android.os.Bundle;
+import android.provider.OpenableColumns;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
+
+import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.card.MaterialCardView;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+
+public class MainActivity extends AppCompatActivity {
+    private static final int REQUEST_PICK_ELF = 41;
+    private static final String PREFS = "neutron_ui";
+    private static final String PREF_SELECTED_FILES = "selected_files";
+
+    private FrameLayout contentContainer;
+    private BottomNavigationView bottomNavigation;
+    private MaterialToolbar toolbar;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        toolbar = findViewById(R.id.toolbar);
+        contentContainer = findViewById(R.id.content_container);
+        bottomNavigation = findViewById(R.id.bottom_navigation);
+        setSupportActionBar(toolbar);
+
+        bottomNavigation.setOnItemSelectedListener(item -> {
+            showScreen(item.getItemId());
+            return true;
+        });
+        bottomNavigation.setSelectedItemId(R.id.nav_home);
+    }
+
+    private void showScreen(int destination) {
+        contentContainer.removeAllViews();
+
+        if (destination == R.id.nav_apps) {
+            toolbar.setTitle("Applications");
+            contentContainer.addView(buildApplicationsScreen());
+        } else if (destination == R.id.nav_terminal) {
+            toolbar.setTitle("Terminal");
+            contentContainer.addView(buildTerminalScreen());
+        } else if (destination == R.id.nav_settings) {
+            toolbar.setTitle("Settings");
+            contentContainer.addView(buildSettingsScreen());
+        } else {
+            toolbar.setTitle("Neutron");
+            contentContainer.addView(buildDashboardScreen());
+        }
+    }
+
+    private ScrollView createPage() {
+        ScrollView scrollView = new ScrollView(this);
+        scrollView.setFillViewport(true);
+        scrollView.setClipToPadding(false);
+
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setPadding(dp(20), dp(18), dp(20), dp(28));
+        scrollView.addView(page);
+        scrollView.setTag(page);
+        return scrollView;
+    }
+
+    private LinearLayout pageContent(ScrollView page) {
+        return (LinearLayout) page.getTag();
+    }
+
+    private ScrollView buildDashboardScreen() {
+        ScrollView page = createPage();
+        LinearLayout content = pageContent(page);
+
+        TextView eyebrow = text("ANDROID × LINUX", 11, R.color.neutron_primary, true);
+        eyebrow.setLetterSpacing(0.12f);
+        content.addView(eyebrow);
+
+        TextView heading = text("Your Linux environment.", 27, R.color.neutron_text, true);
+        LinearLayout.LayoutParams headingParams = params(-1, -2);
+        headingParams.topMargin = dp(7);
+        content.addView(heading, headingParams);
+
+        TextView intro = text("Run x86-64 Linux applications on your Android device.", 14,
+                R.color.neutron_muted, false);
+        LinearLayout.LayoutParams introParams = params(-1, -2);
+        introParams.topMargin = dp(5);
+        content.addView(intro, introParams);
+
+        LinearLayout.LayoutParams statusParams = params(-1, -2);
+        statusParams.topMargin = dp(22);
+        content.addView(buildStatusCard(), statusParams);
+
+        TextView resourcesTitle = sectionTitle("Host device");
+        LinearLayout.LayoutParams sectionParams = params(-1, -2);
+        sectionParams.topMargin = dp(24);
+        content.addView(resourcesTitle, sectionParams);
+
+        LinearLayout metrics = new LinearLayout(this);
+        metrics.setOrientation(LinearLayout.HORIZONTAL);
+        metrics.addView(metricCard("HOST", "ARM64", "Android device"), weightedParams());
+        View gap = new View(this);
+        metrics.addView(gap, new LinearLayout.LayoutParams(dp(10), 1));
+        metrics.addView(metricCard("GUEST", "x86-64", "Linux applications"), weightedParams());
+        LinearLayout.LayoutParams metricsParams = params(-1, -2);
+        metricsParams.topMargin = dp(10);
+        content.addView(metrics, metricsParams);
+
+        TextView actionsTitle = sectionTitle("Quick actions");
+        LinearLayout.LayoutParams actionTitleParams = params(-1, -2);
+        actionTitleParams.topMargin = dp(24);
+        content.addView(actionsTitle, actionTitleParams);
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        MaterialButton appsButton = button("Browse apps");
+        appsButton.setIconResource(R.drawable.ic_apps);
+        appsButton.setOnClickListener(v -> bottomNavigation.setSelectedItemId(R.id.nav_apps));
+        actions.addView(appsButton, weightedParams());
+
+        View actionGap = new View(this);
+        actions.addView(actionGap, new LinearLayout.LayoutParams(dp(10), 1));
+
+        MaterialButton terminalButton = button("Open terminal");
+        terminalButton.setIconResource(R.drawable.ic_terminal);
+        terminalButton.setOnClickListener(v -> bottomNavigation.setSelectedItemId(R.id.nav_terminal));
+        actions.addView(terminalButton, weightedParams());
+
+        LinearLayout.LayoutParams actionsParams = params(-1, -2);
+        actionsParams.topMargin = dp(10);
+        content.addView(actions, actionsParams);
+
+        TextView note = text("The interface is ready for the runtime integration. Translation, graphics and guest execution are not connected in this build.",
+                12, R.color.neutron_muted, false);
+        LinearLayout.LayoutParams noteParams = params(-1, -2);
+        noteParams.topMargin = dp(24);
+        content.addView(note, noteParams);
+
+        return page;
+    }
+
+    private View buildStatusCard() {
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(18), dp(17), dp(18), dp(18));
+
+        LinearLayout top = new LinearLayout(this);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        TextView label = text("RUNTIME STATUS", 11, R.color.neutron_muted, true);
+        label.setLetterSpacing(0.08f);
+        top.addView(label, new LinearLayout.LayoutParams(0, -2, 1));
+
+        TextView state = text("NOT CONNECTED", 10, R.color.neutron_primary, true);
+        state.setBackgroundColor(getColor(R.color.neutron_surface_variant));
+        state.setPadding(dp(9), dp(6), dp(9), dp(6));
+        top.addView(state);
+        body.addView(top);
+
+        TextView title = text("Neutron engine not installed", 18, R.color.neutron_text, true);
+        LinearLayout.LayoutParams titleParams = params(-1, -2);
+        titleParams.topMargin = dp(15);
+        body.addView(title, titleParams);
+
+        TextView description = text("The Android interface is running. The native translator and Linux root filesystem will connect in a later milestone.",
+                13, R.color.neutron_muted, false);
+        LinearLayout.LayoutParams descriptionParams = params(-1, -2);
+        descriptionParams.topMargin = dp(6);
+        body.addView(description, descriptionParams);
+
+        MaterialCardView card = card();
+        card.addView(body);
+        return card;
+    }
+
+    private View metricCard(String label, String value, String detail) {
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(14), dp(15), dp(14), dp(15));
+        body.addView(text(label, 10, R.color.neutron_muted, true));
+
+        TextView main = text(value, 21, R.color.neutron_text, true);
+        LinearLayout.LayoutParams mainParams = params(-1, -2);
+        mainParams.topMargin = dp(8);
+        body.addView(main, mainParams);
+
+        TextView sub = text(detail, 11, R.color.neutron_muted, false);
+        LinearLayout.LayoutParams subParams = params(-1, -2);
+        subParams.topMargin = dp(3);
+        body.addView(sub, subParams);
+
+        MaterialCardView card = card();
+        card.addView(body);
+        return card;
+    }
+
+    private ScrollView buildApplicationsScreen() {
+        ScrollView page = createPage();
+        LinearLayout content = pageContent(page);
+
+        content.addView(text("Your applications", 25, R.color.neutron_text, true));
+        TextView subtitle = text("Keep track of Linux ELF files you want to run with Neutron.",
+                14, R.color.neutron_muted, false);
+        LinearLayout.LayoutParams subtitleParams = params(-1, -2);
+        subtitleParams.topMargin = dp(6);
+        content.addView(subtitle, subtitleParams);
+
+        MaterialButton chooseButton = button("Choose an ELF file");
+        chooseButton.setIconResource(android.R.drawable.ic_menu_add);
+        chooseButton.setOnClickListener(v -> chooseElfFile());
+        LinearLayout.LayoutParams chooseParams = params(-1, -2);
+        chooseParams.topMargin = dp(20);
+        content.addView(chooseButton, chooseParams);
+
+        TextView listTitle = sectionTitle("Selected files");
+        LinearLayout.LayoutParams listTitleParams = params(-1, -2);
+        listTitleParams.topMargin = dp(26);
+        content.addView(listTitle, listTitleParams);
+
+        ArrayList<String> files = getSelectedFiles();
+        if (files.isEmpty()) {
+            MaterialCardView emptyCard = card();
+            LinearLayout empty = new LinearLayout(this);
+            empty.setGravity(Gravity.CENTER);
+            empty.setOrientation(LinearLayout.VERTICAL);
+            empty.setPadding(dp(22), dp(28), dp(22), dp(28));
+            TextView emptyTitle = text("No files selected", 16, R.color.neutron_text, true);
+            emptyTitle.setGravity(Gravity.CENTER);
+            empty.addView(emptyTitle);
+            TextView emptyDescription = text("Choose an ELF file to add an entry here. Execution is not available until the runtime is implemented.",
+                    12, R.color.neutron_muted, false);
+            emptyDescription.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams emptyDescriptionParams = params(-1, -2);
+            emptyDescriptionParams.topMargin = dp(7);
+            empty.addView(emptyDescription, emptyDescriptionParams);
+            emptyCard.addView(empty);
+            LinearLayout.LayoutParams emptyCardParams = params(-1, -2);
+            emptyCardParams.topMargin = dp(10);
+            content.addView(emptyCard, emptyCardParams);
+        } else {
+            for (String file : files) {
+                MaterialCardView fileCard = card();
+                LinearLayout row = new LinearLayout(this);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setPadding(dp(15), dp(14), dp(15), dp(14));
+                TextView icon = text("ELF", 11, R.color.neutron_primary, true);
+                row.addView(icon);
+                LinearLayout details = new LinearLayout(this);
+                details.setOrientation(LinearLayout.VERTICAL);
+                details.setPadding(dp(13), 0, 0, 0);
+                details.addView(text(file, 14, R.color.neutron_text, true));
+                TextView pending = text("Selected · runtime pending", 11, R.color.neutron_muted, false);
+                LinearLayout.LayoutParams pendingParams = params(-1, -2);
+                pendingParams.topMargin = dp(3);
+                details.addView(pending, pendingParams);
+                row.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
+                fileCard.addView(row);
+                LinearLayout.LayoutParams fileParams = params(-1, -2);
+                fileParams.topMargin = dp(9);
+                content.addView(fileCard, fileParams);
+            }
+        }
+
+        TextView disclaimer = text("Selecting a file currently creates a local UI entry only. Neutron does not yet copy, inspect or execute the selected binary.",
+                12, R.color.neutron_muted, false);
+        LinearLayout.LayoutParams disclaimerParams = params(-1, -2);
+        disclaimerParams.topMargin = dp(20);
+        content.addView(disclaimer, disclaimerParams);
+        return page;
+    }
+
+    private ScrollView buildTerminalScreen() {
+        ScrollView page = createPage();
+        LinearLayout content = pageContent(page);
+        content.addView(text("Linux terminal", 25, R.color.neutron_text, true));
+        TextView subtitle = text("A shell for your guest environment.", 14, R.color.neutron_muted, false);
+        LinearLayout.LayoutParams subtitleParams = params(-1, -2);
+        subtitleParams.topMargin = dp(6);
+        content.addView(subtitle, subtitleParams);
+
+        MaterialCardView terminalCard = card();
+        terminalCard.setCardBackgroundColor(0xFF0B1018);
+        LinearLayout terminal = new LinearLayout(this);
+        terminal.setOrientation(LinearLayout.VERTICAL);
+        terminal.setPadding(dp(16), dp(18), dp(16), dp(18));
+        TextView terminalHeader = text("NEUTRON / GUEST SHELL", 10, R.color.neutron_primary, true);
+        terminal.addView(terminalHeader);
+        TextView terminalMessage = text("neutron:~$  status\n\nRuntime connection unavailable.\nThe guest shell will be enabled after the native runtime is integrated.",
+                13, R.color.neutron_text, false);
+        terminalMessage.setTypeface(Typeface.MONOSPACE);
+        terminalMessage.setLineSpacing(dp(5), 1.0f);
+        LinearLayout.LayoutParams messageParams = params(-1, -2);
+        messageParams.topMargin = dp(18);
+        terminal.addView(terminalMessage, messageParams);
+        terminalCard.addView(terminal);
+        LinearLayout.LayoutParams terminalParams = params(-1, -2);
+        terminalParams.topMargin = dp(20);
+        content.addView(terminalCard, terminalParams);
+
+        TextView info = text("This is a terminal preview, not an active shell. Commands are not executed in this version.",
+                12, R.color.neutron_muted, false);
+        LinearLayout.LayoutParams infoParams = params(-1, -2);
+        infoParams.topMargin = dp(15);
+        content.addView(info, infoParams);
+        return page;
+    }
+
+    private ScrollView buildSettingsScreen() {
+        ScrollView page = createPage();
+        LinearLayout content = pageContent(page);
+        content.addView(text("Settings", 25, R.color.neutron_text, true));
+        TextView subtitle = text("Configure how Neutron will use your device.", 14,
+                R.color.neutron_muted, false);
+        LinearLayout.LayoutParams subtitleParams = params(-1, -2);
+        subtitleParams.topMargin = dp(6);
+        content.addView(subtitle, subtitleParams);
+
+        addSettingsCard(content, "Performance", "CPU workers", "Translation and execution worker limits will be configurable here.");
+        addSettingsCard(content, "Memory", "Guest RAM and cache", "Set guest memory, translation cache RAM and persistent cache limits.");
+        addSettingsCard(content, "Graphics", "Vulkan and OpenGL", "Choose rendering mode, display resolution and frame-rate limits.");
+        addSettingsCard(content, "Audio & input", "Devices and controls", "Configure audio output, touch controls, keyboard, mouse and gamepads.");
+        addSettingsCard(content, "Storage", "Root filesystem", "Manage the Linux root filesystem, shared folders and package storage.");
+        addSettingsCard(content, "Appearance", "Dark theme", "Dark mode is the default Neutron appearance in this first UI build.");
+
+        TextView version = text("NEUTRON 0.1.0 · ANDROID UI PREVIEW", 10, R.color.neutron_muted, true);
+        version.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams versionParams = params(-1, -2);
+        versionParams.topMargin = dp(24);
+        content.addView(version, versionParams);
+        return page;
+    }
+
+    private void addSettingsCard(LinearLayout parent, String category, String title, String description) {
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(16), dp(15), dp(16), dp(15));
+        body.addView(text(category.toUpperCase(), 10, R.color.neutron_primary, true));
+        TextView heading = text(title, 16, R.color.neutron_text, true);
+        LinearLayout.LayoutParams headingParams = params(-1, -2);
+        headingParams.topMargin = dp(6);
+        body.addView(heading, headingParams);
+        TextView detail = text(description, 12, R.color.neutron_muted, false);
+        LinearLayout.LayoutParams detailParams = params(-1, -2);
+        detailParams.topMargin = dp(4);
+        body.addView(detail, detailParams);
+        MaterialCardView card = card();
+        card.addView(body);
+        LinearLayout.LayoutParams cardParams = params(-1, -2);
+        cardParams.topMargin = dp(11);
+        parent.addView(card, cardParams);
+    }
+
+    private void chooseElfFile() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        startActivityForResult(intent, REQUEST_PICK_ELF);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQUEST_PICK_ELF || resultCode != RESULT_OK || data == null) {
+            return;
+        }
+
+        Uri uri = data.getData();
+        if (uri == null) {
+            return;
+        }
+
+        String displayName = queryDisplayName(uri);
+        Set<String> selected = new HashSet<>(getPreferences().getStringSet(PREF_SELECTED_FILES, new HashSet<>()));
+        selected.add(displayName);
+        getPreferences().edit().putStringSet(PREF_SELECTED_FILES, selected).apply();
+        showScreen(R.id.nav_apps);
+    }
+
+    private String queryDisplayName(Uri uri) {
+        String name = uri.getLastPathSegment();
+        try (Cursor cursor = getContentResolver().query(uri,
+                new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                int index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                if (index >= 0) {
+                    name = cursor.getString(index);
+                }
+            }
+        } catch (Exception ignored) {
+            // Fall back to the URI's final path segment.
+        }
+        return name == null || name.trim().isEmpty() ? "Selected file" : name;
+    }
+
+    private ArrayList<String> getSelectedFiles() {
+        Set<String> stored = getPreferences().getStringSet(PREF_SELECTED_FILES, new HashSet<>());
+        ArrayList<String> files = new ArrayList<>(stored);
+        Collections.sort(files, String.CASE_INSENSITIVE_ORDER);
+        return files;
+    }
+
+    private SharedPreferences getPreferences() {
+        return getSharedPreferences(PREFS, MODE_PRIVATE);
+    }
+
+    private MaterialCardView card() {
+        MaterialCardView card = new MaterialCardView(this);
+        card.setRadius(dp(20));
+        card.setCardElevation(0);
+        card.setStrokeWidth(dp(1));
+        card.setStrokeColor(getColor(R.color.neutron_outline));
+        card.setCardBackgroundColor(getColor(R.color.neutron_surface));
+        card.setUseCompatPadding(false);
+        return card;
+    }
+
+    private MaterialButton button(String label) {
+        MaterialButton button = new MaterialButton(this);
+        button.setText(label);
+        button.setTextSize(12);
+        button.setCornerRadius(dp(14));
+        button.setMinHeight(dp(48));
+        button.setInsetTop(0);
+        button.setInsetBottom(0);
+        return button;
+    }
+
+    private TextView sectionTitle(String value) {
+        return text(value, 17, R.color.neutron_text, true);
+    }
+
+    private TextView text(String value, int sizeSp, int color, boolean bold) {
+        TextView view = new TextView(this);
+        view.setText(value);
+        view.setTextSize(sizeSp);
+        view.setTextColor(getColor(color));
+        if (bold) {
+            view.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        }
+        return view;
+    }
+
+    private LinearLayout.LayoutParams weightedParams() {
+        return new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
+    }
+
+    private LinearLayout.LayoutParams params(int width, int height) {
+        return new LinearLayout.LayoutParams(width, height);
+    }
+
+    private int dp(float value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+}
