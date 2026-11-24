@@ -62,6 +62,7 @@ DBT is the initial execution strategy.
 - Runtime optimization can be disabled by the user.
 - Use Zydis for x86-64 instruction decoding; Neutron owns instruction-to-IR lowering, IR semantics, optimization, and AArch64 code generation.
 - Pin a stable Zydis release and track its required license notices. Use the decoder API, not Zydis as Neutron's translator or AArch64 code generator.
+- Initial native integration pins Zydis v4.1.1 through CMake FetchContent, recursively fetches its Zycore submodule, and builds a JNI-backed ARM64 Android library. The JNI facade exposes one-instruction x86-64 decoding with Intel-syntax formatting; it does not execute instructions or produce IR.
 - The Zydis adapter, IR, and code generator must have explicit feature boundaries and tests.
 
 ### Cache
@@ -219,7 +220,7 @@ The following require prototypes, tests, or explicit decisions before they can b
 8. PulseAudio protocol/server implementation and audio backend lifecycle.
 9. Rootfs image format, initial contents, delivery, and update integrity.
 10. Minimum Android API level and supported-device test matrix.
-11. Exact build system, native dependency policy, and third-party license inventory.
+11. Native dependency update policy, reproducible dependency pinning, and third-party license inventory.
 
 ## 16. Compatibility promise
 
