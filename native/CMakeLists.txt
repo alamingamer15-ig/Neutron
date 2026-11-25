@@ -62,5 +62,5 @@ target_include_directories(neutron_native PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../core/memory/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../core/process/include
 )
-target_link_libraries(neutron_native PRIVATE Zydis oboe android)
+target_link_libraries(neutron_native PRIVATE Zydis oboe android dl)
 target_compile_options(neutron_native PRIVATE -Wall -Wextra)
