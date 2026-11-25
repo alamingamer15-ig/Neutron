@@ -57,7 +57,7 @@ jobs:
           cd rootfs/images
           sha256sum neutron-aarch64-glibc.tar.gz > neutron-aarch64-glibc.tar.gz.sha256
           ls -lh neutron-aarch64-glibc.tar.gz
-          tar -tzf neutron-aarch64-glibc.tar.gz | grep -E '^\./?(bin|lib|lib64|home|dev|proc)(/|$)' | head -30
+          tar -tzf neutron-aarch64-glibc.tar.gz | grep -E '^\./?(bin|lib|lib64|home|dev|proc)(/|$)' | sed -n '1,30p'
           tar -xOzf neutron-aarch64-glibc.tar.gz ./etc/neutron-rootfs-release
           tar -xOzf neutron-aarch64-glibc.tar.gz ./etc/neutron-android-glibc-release
 
