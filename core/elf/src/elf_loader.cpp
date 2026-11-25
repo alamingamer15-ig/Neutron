@@ -142,6 +142,13 @@ bool ElfLoader::Load(const std::vector<std::uint8_t>& file_bytes,
         const std::uint32_t permissions = ToMemoryPermissions(segment.flags);
         for (std::uint64_t page = start; page < end; page += kGuestPageSize) {
             page_permissions[page] |= permissions;
+            const std::uint32_t combined = page_permissions[page];
+            if ((combined & memory::kMemoryWrite) != 0 &&
+                (combined & memory::kMemoryExecute) != 0) {
+                SetError(error, LoadErrorCode::PermissionFailure,
+                         "ELF requires a writable and executable guest page");
+                return false;
+            }
         }
     }
 
