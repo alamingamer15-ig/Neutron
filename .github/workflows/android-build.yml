@@ -40,6 +40,9 @@ jobs:
       - name: Test ELF loader integration
         run: sh core/elf/tests/run_tests.sh
 
+      - name: Test x86-64 initial process stack
+        run: sh core/process/tests/run_tests.sh
+
       - name: Build debug APK
         run: gradle assembleDebug
 
