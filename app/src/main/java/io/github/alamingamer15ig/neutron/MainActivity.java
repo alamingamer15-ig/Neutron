@@ -366,7 +366,7 @@ public class MainActivity extends AppCompatActivity {
         rootfsStatusParams.topMargin = dp(6);
         rootfsBody.addView(rootfsStatus, rootfsStatusParams);
 
-        MaterialButton chooseRootfs = button("Pick rootfs folder");
+        MaterialButton chooseRootfs = button("Validate external rootfs folder");
         chooseRootfs.setOnClickListener(v -> chooseRootfsFolder(true));
         LinearLayout.LayoutParams chooseRootfsParams = params(-1, -2);
         chooseRootfsParams.topMargin = dp(12);
@@ -748,7 +748,7 @@ public class MainActivity extends AppCompatActivity {
         installParams.topMargin = dp(12);
         body.addView(installDefault, installParams);
 
-        MaterialButton chooseRootfs = button("Choose existing rootfs folder");
+        MaterialButton chooseRootfs = button("Validate external rootfs folder");
         chooseRootfs.setOnClickListener(v -> chooseRootfsFolder());
         LinearLayout.LayoutParams buttonParams = params(-1, -2);
         buttonParams.topMargin = dp(8);
