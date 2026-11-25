@@ -375,30 +375,6 @@ public class MainActivity extends AppCompatActivity {
         rootfsCardParams.topMargin = dp(18);
         content.addView(rootfsCard, rootfsCardParams);
 
-        MaterialButton chooseShell = button("Choose terminal ELF binary");
-        chooseShell.setEnabled(isRootfsValid());
-        chooseShell.setAlpha(chooseShell.isEnabled() ? 1.0f : 0.45f);
-        chooseShell.setOnClickListener(v -> {
-            if (isRootfsValid()) chooseTerminalElf();
-            else Toast.makeText(this, "Choose a valid ARM64 rootfs first.", Toast.LENGTH_SHORT).show();
-        });
-        LinearLayout.LayoutParams chooseShellParams = params(-1, -2);
-        chooseShellParams.topMargin = dp(16);
-        content.addView(chooseShell, chooseShellParams);
-
-        File rootfs = RootfsInstaller.getRootfsDirectory(this);
-        File busybox = new File(rootfs, "bin/busybox");
-        File loader = new File(rootfs, "lib/ld-linux-aarch64.so.1");
-        if (!loader.isFile()) loader = new File(rootfs, "lib64/ld-linux-aarch64.so.1");
-        boolean shellReady = RootfsInstaller.isInstalled(this) && busybox.isFile() && loader.isFile();
-
-        TextView shellStatus = text(shellReady
-                        ? "Using /bin/busybox · ARM64 glibc"
-                        : "Install the built-in ARM64 rootfs to use its BusyBox shell.",
-                12, shellReady ? R.color.neutron_primary : R.color.neutron_muted, false);
-        LinearLayout.LayoutParams shellStatusParams = params(-1, -2);
-        shellStatusParams.topMargin = dp(8);
-        content.addView(shellStatus, shellStatusParams);
 
         MaterialCardView terminalCard = card();
         terminalCard.setCardBackgroundColor(0xFF0B1018);
