@@ -348,7 +348,7 @@ public class MainActivity extends AppCompatActivity {
         ScrollView page = createPage();
         LinearLayout content = pageContent(page);
         content.addView(text("Linux terminal", 25, R.color.neutron_text, true));
-        TextView subtitle = text("Run the ARM64 shell from your selected Linux rootfs.", 14,
+        TextView subtitle = text("Run BusyBox from Neutron’s built-in app-private ARM64 rootfs.", 14,
                 R.color.neutron_muted, false);
         LinearLayout.LayoutParams subtitleParams = params(-1, -2);
         subtitleParams.topMargin = dp(6);
