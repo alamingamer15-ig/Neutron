@@ -2,10 +2,10 @@
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)"
-OUT="$(mktemp "\${TMPDIR:-/tmp}/neutron-memory-tests.XXXXXX")"
+OUT="$(mktemp "${TMPDIR:-/tmp}/neutron-memory-tests.XXXXXX")"
 trap 'rm -f "$OUT"' EXIT HUP INT TERM
 
-"\${CXX:-c++}" \
+"${CXX:-c++}" \
     -std=c++17 \
     -Wall -Wextra -Werror \
     -pthread \
