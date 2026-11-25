@@ -24,8 +24,6 @@ import android.text.InputType;
 import android.widget.TextView;
 import android.widget.Toast;
 import java.io.File;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.io.InputStream;
 
 import androidx.annotation.Nullable;
@@ -429,39 +427,26 @@ public class MainActivity extends AppCompatActivity {
             execute.setEnabled(false);
             transcript.append("\n$ " + entered + "\n");
             new Thread(() -> {
-                StringBuilder output = new StringBuilder();
-                int exitCode = -1;
+                final String result;
                 try {
-                    String libraryPath = new File(rootfs, "lib").getAbsolutePath()
-                            + ":" + new File(rootfs, "usr/lib").getAbsolutePath()
-                            + ":" + new File(rootfs, "lib64").getAbsolutePath();
-                    ProcessBuilder builder = new ProcessBuilder(
-                            loader.getAbsolutePath(), "--library-path", libraryPath,
-                            busybox.getAbsolutePath(), "sh", "-c", entered);
-                    builder.directory(new File(rootfs, "home"));
-                    builder.redirectErrorStream(true);
-                    builder.environment().put("HOME", "/home");
-                    builder.environment().put("USER", "neutron");
-                    builder.environment().put("TERM", "xterm-256color");
-                    builder.environment().put("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
-                    Process process = builder.start();
-                    try (BufferedReader reader = new BufferedReader(
-                            new InputStreamReader(process.getInputStream()))) {
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-                            output.append(line).append('\n');
-                        }
-                    }
-                    exitCode = process.waitFor();
-                } catch (Exception error) {
-                    output.append("Neutron: ").append(error.getClass().getSimpleName())
-                            .append(": ").append(error.getMessage()).append('\n');
+                    result = NeutronTerminal.runCommand(
+                            loader.getAbsolutePath(),
+                            busybox.getAbsolutePath(),
+                            rootfs.getAbsolutePath(),
+                            entered);
+                } catch (RuntimeException error) {
+                    runOnUiThread(() -> {
+                        transcript.append("Neutron: ")
+                                .append(error.getClass().getSimpleName())
+                                .append(": ")
+                                .append(String.valueOf(error.getMessage()))
+                                .append("\n");
+                        execute.setEnabled(true);
+                    });
+                    return;
                 }
-                final String result = output.toString();
-                final int status = exitCode;
                 runOnUiThread(() -> {
                     if (!result.isEmpty()) transcript.append(result);
-                    if (status >= 0) transcript.append("[exit " + status + "]\n");
                     execute.setEnabled(true);
                 });
             }, "neutron-busybox-command").start();
