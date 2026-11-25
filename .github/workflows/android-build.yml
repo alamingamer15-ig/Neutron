@@ -37,6 +37,9 @@ jobs:
       - name: Test guest memory backend
         run: sh core/memory/tests/run_tests.sh
 
+      - name: Test ELF loader integration
+        run: sh core/elf/tests/run_tests.sh
+
       - name: Build debug APK
         run: gradle assembleDebug
 
