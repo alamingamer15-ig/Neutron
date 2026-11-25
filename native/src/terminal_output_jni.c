@@ -209,9 +209,14 @@ Java_io_github_alamingamer15ig_neutron_NeutronTerminal_nativeRunCommand(
                   &output_length, "[Neutron execution diagnostics]\n");
     append_format(output, TERMINAL_OUTPUT_LIMIT + TERMINAL_OUTPUT_EXTRA,
                   &output_length, "[stage 1/7] Arguments prepared\n");
+    size_t command_preview_length = strlen(command);
+    if (command_preview_length > 2048U) command_preview_length = 2048U;
     append_format(output, TERMINAL_OUTPUT_LIMIT + TERMINAL_OUTPUT_EXTRA,
-                  &output_length, "  command: %s\n  rootfs: %s\n  home: %s\n",
-                  command, rootfs, home);
+                  &output_length, "  command (%lu bytes): %.*s%s\n  rootfs: %s\n  home: %s\n",
+                  (unsigned long) strlen(command),
+                  (int) command_preview_length, command,
+                  strlen(command) > command_preview_length ? "..." : "",
+                  rootfs, home);
     append_format(output, TERMINAL_OUTPUT_LIMIT + TERMINAL_OUTPUT_EXTRA,
                   &output_length, "  loader: %s\n  busybox: %s\n",
                   loader, busybox);
@@ -312,7 +317,8 @@ Java_io_github_alamingamer15ig_neutron_NeutronTerminal_nativeRunCommand(
         for (;;) {
             ssize_t count = read(pipe_fds[0], chunk, sizeof(chunk));
             if (count > 0) {
-                size_t remaining = TERMINAL_OUTPUT_LIMIT - output_length;
+                size_t remaining = output_length < TERMINAL_OUTPUT_LIMIT
+                        ? TERMINAL_OUTPUT_LIMIT - output_length : 0U;
                 size_t copied = (size_t) count < remaining ? (size_t) count : remaining;
                 if (copied != 0) {
                     (void) append_bytes(output, TERMINAL_OUTPUT_LIMIT,
