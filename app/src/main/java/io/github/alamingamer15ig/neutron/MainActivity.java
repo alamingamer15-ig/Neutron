@@ -12,6 +12,9 @@ import android.provider.OpenableColumns;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
+import android.content.Context;
 import android.widget.FrameLayout;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -21,6 +24,8 @@ import android.text.InputType;
 import android.widget.TextView;
 import android.widget.Toast;
 import java.io.File;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.io.InputStream;
 
 import androidx.annotation.Nullable;
@@ -381,11 +386,16 @@ public class MainActivity extends AppCompatActivity {
         chooseShellParams.topMargin = dp(16);
         content.addView(chooseShell, chooseShellParams);
 
-        String shellName = getPreferences().getString(PREF_TERMINAL_ELF_NAME, null);
-        TextView shellStatus = text(shellName == null
-                        ? "No terminal binary selected. Choose an ARM64 shell ELF (sh, ash, bash, or BusyBox)."
-                        : "Terminal ELF: " + shellName + " · AArch64 validated",
-                12, shellName == null ? R.color.neutron_muted : R.color.neutron_primary, false);
+        File rootfs = RootfsInstaller.getRootfsDirectory(this);
+        File busybox = new File(rootfs, "bin/busybox");
+        File loader = new File(rootfs, "lib/ld-linux-aarch64.so.1");
+        if (!loader.isFile()) loader = new File(rootfs, "lib64/ld-linux-aarch64.so.1");
+        boolean shellReady = RootfsInstaller.isInstalled(this) && busybox.isFile() && loader.isFile();
+
+        TextView shellStatus = text(shellReady
+                        ? "Using /bin/busybox · ARM64 glibc"
+                        : "Install the built-in ARM64 rootfs to use its BusyBox shell.",
+                12, shellReady ? R.color.neutron_primary : R.color.neutron_muted, false);
         LinearLayout.LayoutParams shellStatusParams = params(-1, -2);
         shellStatusParams.topMargin = dp(8);
         content.addView(shellStatus, shellStatusParams);
@@ -395,14 +405,15 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout terminal = new LinearLayout(this);
         terminal.setOrientation(LinearLayout.VERTICAL);
         terminal.setPadding(dp(16), dp(18), dp(16), dp(18));
-        terminal.addView(text("NEUTRON / ARM64 SHELL", 10, R.color.neutron_primary, true));
+        terminal.addView(text("NEUTRON / BUSYBOX (ARM64)", 10, R.color.neutron_primary, true));
 
-        TextView transcript = text(shellName == null
-                        ? "Select a valid ARM64 terminal ELF to open the shell.\n"
-                        : "$ ",
+        TextView transcript = text(shellReady
+                        ? "BusyBox shell session · commands run in the selected rootfs\n"
+                        : "Rootfs unavailable. Install it above to start BusyBox.\n",
                 13, R.color.neutron_text, false);
         transcript.setTypeface(Typeface.MONOSPACE);
         transcript.setLineSpacing(dp(5), 1.0f);
+        transcript.setTextIsSelectable(true);
         LinearLayout.LayoutParams transcriptParams = params(-1, -2);
         transcriptParams.topMargin = dp(18);
         terminal.addView(transcript, transcriptParams);
@@ -411,24 +422,88 @@ public class MainActivity extends AppCompatActivity {
         command.setSingleLine(true);
         command.setTextSize(13);
         command.setTypeface(Typeface.MONOSPACE);
-        command.setHint("Command");
-        command.setInputType(InputType.TYPE_CLASS_TEXT);
-        command.setEnabled(false);
-        command.setAlpha(0.55f);
+        command.setHint("Type a BusyBox command");
+        command.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        command.setImeOptions(EditorInfo.IME_ACTION_DONE);
+        command.setEnabled(shellReady);
+        command.setFocusableInTouchMode(true);
+        command.setOnClickListener(v -> showTerminalKeyboard(command));
+        command.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) command.post(() -> showTerminalKeyboard(command));
+        });
         LinearLayout.LayoutParams commandParams = params(-1, -2);
         commandParams.topMargin = dp(10);
         terminal.addView(command, commandParams);
 
         MaterialButton execute = button("Run command");
-        execute.setEnabled(false);
-        execute.setAlpha(0.45f);
+        execute.setEnabled(shellReady);
+        execute.setAlpha(shellReady ? 1.0f : 0.45f);
         LinearLayout.LayoutParams executeParams = params(-1, -2);
         executeParams.topMargin = dp(8);
         terminal.addView(execute, executeParams);
 
-        TextView backendInfo = text(shellName == null
-                        ? "The prompt will become active after a valid shell is selected and the process backend is connected."
-                        : "Shell ELF accepted. Command execution and stdout are waiting for Neutron's ARM64 process/syscall backend; this build will not fake command output.",
+        Runnable runCommand = () -> {
+            String entered = command.getText().toString().trim();
+            if (entered.isEmpty() || !shellReady) return;
+            command.setText("");
+            InputMethodManager imm = (InputMethodManager) getSystemService(
+                    Context.INPUT_METHOD_SERVICE);
+            if (imm != null) imm.hideSoftInputFromWindow(command.getWindowToken(), 0);
+            execute.setEnabled(false);
+            transcript.append("\n$ " + entered + "\n");
+            new Thread(() -> {
+                StringBuilder output = new StringBuilder();
+                int exitCode = -1;
+                try {
+                    String libraryPath = new File(rootfs, "lib").getAbsolutePath()
+                            + ":" + new File(rootfs, "usr/lib").getAbsolutePath()
+                            + ":" + new File(rootfs, "lib64").getAbsolutePath();
+                    ProcessBuilder builder = new ProcessBuilder(
+                            loader.getAbsolutePath(), "--library-path", libraryPath,
+                            busybox.getAbsolutePath(), "sh", "-c", entered);
+                    builder.directory(new File(rootfs, "home"));
+                    builder.redirectErrorStream(true);
+                    builder.environment().put("HOME", "/home");
+                    builder.environment().put("USER", "neutron");
+                    builder.environment().put("TERM", "xterm-256color");
+                    builder.environment().put("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
+                    Process process = builder.start();
+                    try (BufferedReader reader = new BufferedReader(
+                            new InputStreamReader(process.getInputStream()))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            output.append(line).append('\n');
+                        }
+                    }
+                    exitCode = process.waitFor();
+                } catch (Exception error) {
+                    output.append("Neutron: ").append(error.getClass().getSimpleName())
+                            .append(": ").append(error.getMessage()).append('\n');
+                }
+                final String result = output.toString();
+                final int status = exitCode;
+                runOnUiThread(() -> {
+                    if (!result.isEmpty()) transcript.append(result);
+                    if (status >= 0) transcript.append("[exit ").append(String.valueOf(status)).append("]\n");
+                    execute.setEnabled(true);
+                });
+            }, "neutron-busybox-command").start();
+        };
+        execute.setOnClickListener(v -> runCommand.run());
+        command.setOnEditorActionListener((view, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_DONE
+                    || actionId == EditorInfo.IME_ACTION_GO
+                    || actionId == EditorInfo.IME_ACTION_SEND) {
+                runCommand.run();
+                return true;
+            }
+            return false;
+        });
+
+        TextView backendInfo = text(shellReady
+                        ? "Commands execute through the rootfs glibc loader and BusyBox. Each command currently starts a fresh shell; interactive programs and persistent shell state need a PTY backend."
+                        : "BusyBox command input becomes available after installing the built-in ARM64 rootfs.",
                 12, R.color.neutron_muted, false);
         LinearLayout.LayoutParams backendInfoParams = params(-1, -2);
         backendInfoParams.topMargin = dp(12);
@@ -439,6 +514,16 @@ public class MainActivity extends AppCompatActivity {
         terminalParams.topMargin = dp(16);
         content.addView(terminalCard, terminalParams);
         return page;
+    }
+
+    private void showTerminalKeyboard(EditText command) {
+        if (!command.isEnabled()) return;
+        command.requestFocus();
+        command.post(() -> {
+            InputMethodManager imm = (InputMethodManager) getSystemService(
+                    Context.INPUT_METHOD_SERVICE);
+            if (imm != null) imm.showSoftInput(command, InputMethodManager.SHOW_IMPLICIT);
+        });
     }
 
     private ScrollView buildSettingsScreen() {
