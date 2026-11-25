@@ -62,6 +62,14 @@ jobs:
           tar -tzf neutron-aarch64-glibc.tar.gz | grep -E '^\./?(bin|lib|lib64|home|dev|proc)(/|$)' | sed -n '1,30p'
           tar -xOzf neutron-aarch64-glibc.tar.gz ./etc/neutron-rootfs-release
           tar -xOzf neutron-aarch64-glibc.tar.gz ./etc/neutron-android-glibc-release
+          mkdir -p /tmp/neutron-rootfs-verify
+          tar -xzf neutron-aarch64-glibc.tar.gz -C /tmp/neutron-rootfs-verify
+          test -x /tmp/neutron-rootfs-verify/lib/ld-linux-aarch64.so.1
+          test -x /tmp/neutron-rootfs-verify/bin/busybox
+          for library in libc.so.6 libdl.so.2 libm.so.6 libpthread.so.0; do
+            readelf -h "/tmp/neutron-rootfs-verify/lib/$library" | grep -q 'Machine:.*AArch64'
+          done
+          readelf -h /tmp/neutron-rootfs-verify/lib/ld-linux-aarch64.so.1 | grep -q 'Machine:.*AArch64'
 
       - name: Commit rootfs archive to main
         run: |
