@@ -7,7 +7,6 @@ on:
       - ".github/workflows/build-rootfs.yml"
       - "rootfs/buildroot/**"
       - "scripts/install-android-glibc.sh"
-      - "scripts/install-android-glibc.sh"
   workflow_dispatch:
 
 permissions:
