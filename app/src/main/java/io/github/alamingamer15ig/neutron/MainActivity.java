@@ -937,7 +937,7 @@ public class MainActivity extends AppCompatActivity {
             return "No rootfs selected. Launch is disabled.";
         }
         if (isRootfsValid()) {
-            return "Valid ARM64 rootfs · required directories and AArch64 glibc loader found.";
+            return "External rootfs validated, but SAF folders are not executable here. Install the built-in rootfs to run commands.";
         }
         return "Invalid or inaccessible rootfs. It must contain /bin, /lib, /home, /dev, /proc and the AArch64 glibc loader.";
     }
