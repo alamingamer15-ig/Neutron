@@ -42,7 +42,7 @@ jobs:
         run: |
           cp rootfs/buildroot/neutron_aarch64_glibc_defconfig /tmp/buildroot-src/.config
           sudo install -m 0755 rootfs/buildroot/post-build.sh /tmp/neutron-post-build.sh
-          sudo install -m 0755 rootfs/buildroot/install-android-glibc.sh /tmp/install-android-glibc.sh
+          sudo install -m 0755 scripts/install-android-glibc.sh /tmp/install-android-glibc.sh
           make -C /tmp/buildroot-src olddefconfig
 
       - name: Build root filesystem
