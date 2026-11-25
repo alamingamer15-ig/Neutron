@@ -4,6 +4,10 @@ Neutron's default guest filesystem is built with Buildroot, using an AArch64 tar
 glibc, and BusyBox. It is intended as a minimal native ARM64 userspace base rather than a full
 general-purpose distribution.
 
+## Android-compatible glibc
+
+The default rootfs replaces Buildroot's core AArch64 glibc loader and runtime libraries with the pinned Android-sandbox-patched glibc 2.42.9 build from jjtseng93/glibc-for-android-native. The APK separately packages the matching loader in its extracted native-library directory so Android can execute it from the app installation location. The rootfs installer requires the Android-glibc release marker and automatically replaces older unpatched default rootfs installations.
+
 ## Contents
 
 - AArch64 glibc runtime and ELF dynamic loader
