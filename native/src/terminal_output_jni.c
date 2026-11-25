@@ -105,9 +105,10 @@ Java_io_github_alamingamer15ig_neutron_NeutronTerminal_nativeRunCommand(
                     "PATH=%s/usr/local/sbin:%s/usr/local/bin:%s/usr/sbin:%s/usr/bin:%s/sbin:%s/bin",
                     rootfs, rootfs, rootfs, rootfs, rootfs, rootfs);
 
+    static const char system_linker[] = "/system/bin/linker64";
     char *const child_argv[] = {
-        loader, (char *) "--library-path", library_path,
-        busybox, (char *) "sh", (char *) "-c", command, NULL
+        (char *) system_linker, loader, (char *) "--library-path",
+        library_path, busybox, (char *) "sh", (char *) "-c", command, NULL
     };
     char *const child_envp[] = {
         home_env, user_env, term_env, lang_env, path_env, NULL
@@ -138,14 +139,14 @@ Java_io_github_alamingamer15ig_neutron_NeutronTerminal_nativeRunCommand(
             (void) write(STDOUT_FILENO, error_text, sizeof(error_text) - 1U);
             _exit(126);
         }
-        execve(loader, child_argv, child_envp);
+        execve(system_linker, child_argv, child_envp);
         {
             int exec_error = errno;
-            char error_text[PATH_MAX + 160];
+            char error_text[PATH_MAX + 192];
             int error_length = snprintf(
                     error_text, sizeof(error_text),
-                    "Neutron: execve failed for ARM64 loader '%s': errno=%d (%s)\n",
-                    loader, exec_error, strerror(exec_error));
+                    "Neutron: execve failed for Android system linker '%s': errno=%d (%s)\n",
+                    system_linker, exec_error, strerror(exec_error));
             if (error_length > 0) {
                 size_t bytes = (size_t) error_length;
                 if (bytes >= sizeof(error_text)) bytes = sizeof(error_text) - 1U;
