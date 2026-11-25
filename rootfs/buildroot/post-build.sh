@@ -12,5 +12,5 @@ chmod 1777 "$TARGET_DIR/tmp"
 # glibc build. The loader is also packaged separately in the APK's native lib dir.
 sh "$SCRIPT_DIR/install-android-glibc.sh" rootfs "$TARGET_DIR"
 
-printf '%s\\n' "Neutron AArch64 rootfs with Android-compatible glibc 2.42.9" \
+printf '%s\n' "Neutron AArch64 rootfs with Android-compatible glibc 2.42.9" \
     > "$TARGET_DIR/etc/neutron-rootfs-release"
