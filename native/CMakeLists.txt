@@ -44,6 +44,7 @@ add_library(neutron_native SHARED
     ../core/elf/src/elf_parser.cpp
     ../core/elf/src/elf_validator.cpp
     ../core/elf/src/elf_loader.cpp
+    ../core/memory/src/guest_memory.cpp
     src/logging/logger.cpp
     src/neutron_jni.cpp
 )
