@@ -433,7 +433,7 @@ public class MainActivity extends AppCompatActivity {
 
         diagnosticsButton.setOnClickListener(v -> {
             diagnosticsButton.setEnabled(false);
-            transcript.append("\\n$ Neutron platform diagnostics\\n");
+            transcript.append("\n$ Neutron platform diagnostics\n");
             new Thread(() -> {
                 final String result;
                 try {
@@ -442,7 +442,7 @@ public class MainActivity extends AppCompatActivity {
                     runOnUiThread(() -> {
                         transcript.append("Diagnostics bridge failed: "
                                 + error.getClass().getSimpleName()
-                                + ": " + String.valueOf(error.getMessage()) + "\\n");
+                                + ": " + String.valueOf(error.getMessage()) + "\n");
                         diagnosticsButton.setEnabled(true);
                     });
                     return;
