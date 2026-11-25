@@ -740,8 +740,10 @@ public class MainActivity extends AppCompatActivity {
         statusParams.topMargin = dp(5);
         body.addView(status, statusParams);
 
-        MaterialButton installDefault = button("Install default ARM64 glibc rootfs");
-        installDefault.setOnClickListener(v -> installDefaultRootfs(status, installDefault, false));
+        MaterialButton installDefault = button(RootfsInstaller.isInstalled(this)
+                ? "Reinstall ARM64 rootfs" : "Install default ARM64 glibc rootfs");
+        installDefault.setOnClickListener(v -> installDefaultRootfs(
+                status, installDefault, false, RootfsInstaller.isInstalled(this)));
         LinearLayout.LayoutParams installParams = params(-1, -2);
         installParams.topMargin = dp(12);
         body.addView(installDefault, installParams);
@@ -760,6 +762,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void installDefaultRootfs(TextView status, MaterialButton installButton, boolean returnToTerminal) {
+        installDefaultRootfs(status, installButton, returnToTerminal, false);
+    }
+
+    private void installDefaultRootfs(TextView status, MaterialButton installButton,
+                                      boolean returnToTerminal, boolean forceReinstall) {
         installButton.setEnabled(false);
         status.setText("Downloading Neutron ARM64 glibc rootfs…");
         new Thread(() -> {
@@ -767,7 +774,8 @@ public class MainActivity extends AppCompatActivity {
                 File installed = RootfsInstaller.install(this, percent ->
                         runOnUiThread(() -> status.setText(
                                 percent < 0 ? "Extracting ARM64 glibc rootfs…" :
-                                        "Downloading ARM64 glibc rootfs… " + percent + "%")));
+                                        "Downloading ARM64 glibc rootfs… " + percent + "%")),
+                        forceReinstall);
                 runOnUiThread(() -> {
                     status.setText("Neutron minimal glibc · ARM64 · installed in app storage");
                     installButton.setText("Reinstall ARM64 rootfs");
