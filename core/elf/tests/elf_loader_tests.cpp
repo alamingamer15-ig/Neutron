@@ -132,7 +132,7 @@ void TestStaticExecutableLoad() {
 
     const std::uint8_t replacement = 0xcc;
     assert(!memory.Write(image.entry_point, &replacement, 1));
-    assert(!memory.Fetch(0x400000, actual, 1) == false); // RX segment is executable.
+    assert(memory.Fetch(0x400000, actual, 1)); // RX segment is executable.
 }
 
 void TestPieLoadBias() {
