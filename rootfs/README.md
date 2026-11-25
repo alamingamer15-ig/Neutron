@@ -6,7 +6,7 @@ general-purpose distribution.
 
 ## Android-compatible glibc
 
-The default rootfs replaces Buildroot's core AArch64 glibc loader and runtime libraries with the pinned Android-sandbox-patched glibc 2.42.9 build from jjtseng93/glibc-for-android-native. The APK separately packages the matching loader in its extracted native-library directory so Android can execute it from the app installation location. The rootfs installer requires the Android-glibc release marker and automatically replaces older unpatched default rootfs installations.
+The default rootfs replaces Buildroot's core AArch64 glibc loader and runtime libraries with the pinned Android-sandbox-patched glibc 2.42.9 build from jjtseng93/glibc-for-android-native. The APK separately packages the matching loader in its extracted native-library directory so Android can execute it from the app installation location. The rootfs installer requires the Android-glibc release marker and treats older unpatched default rootfs installations as stale; reinstall the default rootfs from the app to replace one.
 
 ## Contents
 
