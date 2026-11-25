@@ -390,6 +390,11 @@ public class MainActivity extends AppCompatActivity {
         terminal.setPadding(dp(16), dp(18), dp(16), dp(18));
         terminal.addView(text("NEUTRON / BUSYBOX (ARM64)", 10, R.color.neutron_primary, true));
 
+        MaterialButton diagnosticsButton = button("Run execution diagnostics");
+        LinearLayout.LayoutParams diagnosticsParams = params(-1, -2);
+        diagnosticsParams.topMargin = dp(12);
+        terminal.addView(diagnosticsButton, diagnosticsParams);
+
         TextView transcript = text(shellReady
                         ? "BusyBox shell session · commands run in the selected rootfs\n"
                         : "Rootfs unavailable. Install it above to start BusyBox.\n",
@@ -425,6 +430,29 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout.LayoutParams executeParams = params(-1, -2);
         executeParams.topMargin = dp(8);
         terminal.addView(execute, executeParams);
+
+        diagnosticsButton.setOnClickListener(v -> {
+            diagnosticsButton.setEnabled(false);
+            transcript.append("\\n$ Neutron platform diagnostics\\n");
+            new Thread(() -> {
+                final String result;
+                try {
+                    result = NeutronTerminal.runPlatformDiagnostics(getFilesDir().getAbsolutePath());
+                } catch (Throwable error) {
+                    runOnUiThread(() -> {
+                        transcript.append("Diagnostics bridge failed: "
+                                + error.getClass().getSimpleName()
+                                + ": " + String.valueOf(error.getMessage()) + "\\n");
+                        diagnosticsButton.setEnabled(true);
+                    });
+                    return;
+                }
+                runOnUiThread(() -> {
+                    transcript.append(result);
+                    diagnosticsButton.setEnabled(true);
+                });
+            }, "neutron-platform-diagnostics").start();
+        });
 
         Runnable runCommand = () -> {
             String entered = command.getText().toString().trim();
