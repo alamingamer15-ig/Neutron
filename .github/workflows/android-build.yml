@@ -29,6 +29,13 @@ jobs:
             cmake;3.22.1
             ndk;27.2.12479018
 
+      - name: Fetch pinned Android-compatible glibc loader
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl git binutils
+          sh scripts/install-android-glibc.sh apk app/src/main/jniLibs/arm64-v8a
+          readelf -h app/src/main/jniLibs/arm64-v8a/libldcustom.so | grep 'Machine:.*AArch64'
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -46,9 +53,10 @@ jobs:
       - name: Build debug APK
         run: gradle assembleDebug
 
-      - name: Verify shared C++ runtime is packaged
+      - name: Verify Android-compatible glibc loader and shared C++ runtime are packaged
         run: |
-          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/arm64-v8a/libc\+\+_shared\.so$'
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/arm64-v8a/libc\\+\\+_shared\\.so$'
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/arm64-v8a/libldcustom\\.so$'
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
