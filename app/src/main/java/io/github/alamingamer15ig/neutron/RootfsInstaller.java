@@ -175,7 +175,7 @@ public final class RootfsInstaller {
         // Normalize the loader location for the rest of Neutron. Some rootfs
         // builds place the interpreter under /usr/lib; keep a stable /lib path.
         File canonicalLoader = new File(root, "lib/ld-linux-aarch64.so.1");
-        if (!canonicalLoader.isFile() && !loader.equals(canonicalLoader)) {
+        if (!isAarch64Elf(canonicalLoader) && !loader.equals(canonicalLoader)) {
             Files.createDirectories(canonicalLoader.toPath().getParent());
             Files.deleteIfExists(canonicalLoader.toPath());
             Files.copy(loader.toPath(), canonicalLoader.toPath());
