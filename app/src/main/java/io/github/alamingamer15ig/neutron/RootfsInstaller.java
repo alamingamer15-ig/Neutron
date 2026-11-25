@@ -48,15 +48,17 @@ public final class RootfsInstaller {
         File root = getRootfsDirectory(context);
         File loaderFile = new File(root, "lib64/ld-linux-aarch64.so.1");
         if (!loaderFile.isFile()) loaderFile = new File(root, "lib/ld-linux-aarch64.so.1");
-        boolean loader = isAarch64Elf(loaderFile);
-        return new File(root, "bin").isDirectory()
-                && new File(root, "lib").isDirectory()
-                && new File(root, "home").isDirectory()
-                && new File(root, "dev").isDirectory()
-                && new File(root, "proc").isDirectory()
+        File busyboxFile = new File(root, "bin/busybox");
+        boolean loader = isAarch64Elf(loaderFile) && loaderFile.canExecute();
+        return root.isDirectory() && root.canExecute()
+                && new File(root, "bin").isDirectory() && new File(root, "bin").canExecute()
+                && new File(root, "lib").isDirectory() && new File(root, "lib").canExecute()
+                && new File(root, "home").isDirectory() && new File(root, "home").canExecute()
+                && new File(root, "dev").isDirectory() && new File(root, "dev").canExecute()
+                && new File(root, "proc").isDirectory() && new File(root, "proc").canExecute()
                 && new File(root, "etc/neutron-rootfs-release").isFile()
                 && loader
-                && isAarch64Elf(new File(root, "bin/busybox"));
+                && isAarch64Elf(busyboxFile) && busyboxFile.canExecute();
     }
 
     public static File install(Context context, ProgressListener listener) throws Exception {
@@ -84,7 +86,8 @@ public final class RootfsInstaller {
             listener.onProgress(-1);
         }
         extractArchive(archive, staging);
-File parent = root.getParentFile();
+        ensureRuntimePermissions(staging);
+        File parent = root.getParentFile();
         if (!parent.exists() && !parent.mkdirs()) {
             throw new IllegalStateException("Cannot create rootfs storage");
         }
@@ -98,6 +101,42 @@ File parent = root.getParentFile();
             throw new IllegalStateException("Rootfs failed ARM64 glibc validation");
         }
         return root;
+    }
+
+    private static void ensureRuntimePermissions(File root) throws Exception {
+        File[] directories = {
+                root, new File(root, "bin"), new File(root, "lib"),
+                new File(root, "lib64"), new File(root, "home"),
+                new File(root, "dev"), new File(root, "proc")
+        };
+        for (File directory : directories) {
+            if (directory.isDirectory() && !directory.setExecutable(true, false)
+                    && !directory.canExecute()) {
+                throw new IllegalStateException(
+                        "Cannot make rootfs directory searchable: " + directory.getPath());
+            }
+        }
+
+        File busybox = new File(root, "bin/busybox");
+        File loader = new File(root, "lib64/ld-linux-aarch64.so.1");
+        if (!loader.isFile()) {
+            loader = new File(root, "lib/ld-linux-aarch64.so.1");
+        }
+        File[] executables = {busybox, loader};
+        for (File executable : executables) {
+            if (!executable.isFile()) {
+                throw new IllegalStateException(
+                        "Required ARM64 executable is missing: " + executable.getPath());
+            }
+            if (!executable.setExecutable(true, false) && !executable.canExecute()) {
+                throw new IllegalStateException(
+                        "Cannot make ARM64 executable runnable: " + executable.getPath());
+            }
+            if (!executable.canExecute()) {
+                throw new IllegalStateException(
+                        "ARM64 executable permission verification failed: " + executable.getPath());
+            }
+        }
     }
 
     private static boolean isAarch64Elf(File file) {
