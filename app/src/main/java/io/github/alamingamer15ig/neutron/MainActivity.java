@@ -337,6 +337,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private ScrollView buildTerminalScreen() {
+        File rootfs = RootfsInstaller.getRootfsDirectory(this);
+        File busybox = new File(rootfs, "bin/busybox");
+        File loader = new File(rootfs, "lib64/ld-linux-aarch64.so.1");
+        if (!loader.isFile()) {
+            loader = new File(rootfs, "lib/ld-linux-aarch64.so.1");
+        }
+        boolean shellReady = RootfsInstaller.isInstalled(this)
+                && busybox.isFile() && loader.isFile();
         ScrollView page = createPage();
         LinearLayout content = pageContent(page);
         content.addView(text("Linux terminal", 25, R.color.neutron_text, true));
@@ -436,11 +444,9 @@ public class MainActivity extends AppCompatActivity {
                             entered);
                 } catch (RuntimeException error) {
                     runOnUiThread(() -> {
-                        transcript.append("Neutron: ")
-                                .append(error.getClass().getSimpleName())
-                                .append(": ")
-                                .append(String.valueOf(error.getMessage()))
-                                .append("\n");
+                        transcript.append("Neutron: "
+                                + error.getClass().getSimpleName()
+                                + ": " + String.valueOf(error.getMessage()) + "\n");
                         execute.setEnabled(true);
                     });
                     return;
