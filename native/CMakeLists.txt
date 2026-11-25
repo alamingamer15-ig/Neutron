@@ -7,6 +7,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# All native targets use the shared Android C++ runtime.
+if(ANDROID AND NOT ANDROID_STL STREQUAL "c++_shared")
+    message(FATAL_ERROR "Neutron requires ANDROID_STL=c++_shared")
+endif()
+
 set(ZYDIS_BUILD_SHARED_LIB OFF CACHE BOOL "" FORCE)
 set(ZYDIS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(ZYDIS_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
