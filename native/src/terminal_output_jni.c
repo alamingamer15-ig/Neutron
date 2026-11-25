@@ -1,5 +1,7 @@
+#define _GNU_SOURCE
 #define _POSIX_C_SOURCE 200809L
 #include <jni.h>
+#include <dlfcn.h>
 #include <android/sharedmem.h>
 
 #include <errno.h>
@@ -119,6 +121,33 @@ static void append_path_diagnostics(char *output, size_t capacity,
     }
 }
 
+/* Prefer the loader extracted beside libneutron_native.so in /data/app.
+ * Executing the glibc loader from app-private writable storage is not reliable
+ * on Android; nativeLibraryDir is the platform-supported executable location.
+ */
+static char *resolve_packaged_loader(const char *fallback) {
+    Dl_info info;
+    memset(&info, 0, sizeof(info));
+    if (dladdr((void *) resolve_packaged_loader, &info) != 0
+            && info.dli_fname != NULL) {
+        const char *separator = strrchr(info.dli_fname, '/');
+        if (separator != NULL) {
+            size_t directory_length = (size_t) (separator - info.dli_fname) + 1U;
+            static const char filename[] = "libldcustom.so";
+            char *candidate = (char *) malloc(directory_length + sizeof(filename));
+            if (candidate != NULL) {
+                memcpy(candidate, info.dli_fname, directory_length);
+                memcpy(candidate + directory_length, filename, sizeof(filename));
+                if (access(candidate, X_OK) == 0) {
+                    return candidate;
+                }
+                free(candidate);
+            }
+        }
+    }
+    return strdup(fallback);
+}
+
 static jbyteArray make_result(JNIEnv *env, const char *buffer, size_t length) {
     if (length > (size_t) INT_MAX) return NULL;
     jbyteArray result = (*env)->NewByteArray(env, (jsize) length);
@@ -155,7 +184,7 @@ Java_io_github_alamingamer15ig_neutron_NeutronTerminal_nativeRunCommand(
         return NULL;
     }
 
-    char *loader = strdup(loader_utf);
+    char *loader = resolve_packaged_loader(loader_utf);
     char *busybox = strdup(busybox_utf);
     char *rootfs = strdup(rootfs_utf);
     char *command = strdup(command_utf);
