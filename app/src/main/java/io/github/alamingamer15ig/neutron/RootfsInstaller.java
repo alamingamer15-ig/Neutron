@@ -177,6 +177,7 @@ public final class RootfsInstaller {
         File canonicalLoader = new File(root, "lib/ld-linux-aarch64.so.1");
         if (!canonicalLoader.isFile() && !loader.equals(canonicalLoader)) {
             Files.createDirectories(canonicalLoader.toPath().getParent());
+            Files.deleteIfExists(canonicalLoader.toPath());
             Files.copy(loader.toPath(), canonicalLoader.toPath());
             canonicalLoader.setReadable(true, false);
             canonicalLoader.setExecutable(true, false);
