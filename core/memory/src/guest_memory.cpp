@@ -11,6 +11,7 @@ namespace {
 constexpr std::uint32_t kKnownPermissions =
     kMemoryRead | kMemoryWrite | kMemoryExecute;
 constexpr std::uint64_t kPageMask = SparseGuestMemory::kPageSize - 1;
+constexpr std::uint64_t kMaximumGuestAddress = 0x00007fffffffffffULL;
 
 } // namespace
 
@@ -19,10 +20,15 @@ SparseGuestMemory::SparseGuestMemory(std::uint64_t maximum_mapped_bytes)
 
 bool SparseGuestMemory::IsValidRange(std::uint64_t address,
                                      std::uint64_t size) noexcept {
-    return size != 0 &&
-           (address & kPageMask) == 0 &&
-           (size & kPageMask) == 0 &&
-           size <= std::numeric_limits<std::uint64_t>::max() - address;
+    return size != 0 && address <= kMaximumGuestAddress &&
+           (address & kPageMask) == 0 && (size & kPageMask) == 0 &&
+           size - 1 <= kMaximumGuestAddress - address;
+}
+
+bool SparseGuestMemory::IsValidAccessRange(std::uint64_t address,
+                                           std::uint64_t size) noexcept {
+    return size == 0 || (address <= kMaximumGuestAddress &&
+           size - 1 <= kMaximumGuestAddress - address);
 }
 
 bool SparseGuestMemory::Map(std::uint64_t guest_address, std::uint64_t size,
@@ -70,9 +76,21 @@ bool SparseGuestMemory::Map(std::uint64_t guest_address, std::uint64_t size,
 
 bool SparseGuestMemory::Read(std::uint64_t guest_address, void* destination,
                              std::size_t size) const {
+    return ReadWithPermission(guest_address, destination, size, kMemoryRead);
+}
+
+bool SparseGuestMemory::Fetch(std::uint64_t guest_address, void* destination,
+                              std::size_t size) const {
+    return ReadWithPermission(guest_address, destination, size, kMemoryExecute);
+}
+
+bool SparseGuestMemory::ReadWithPermission(std::uint64_t guest_address,
+                                           void* destination,
+                                           std::size_t size,
+                                           std::uint32_t permission) const {
     if (size == 0) return true;
     if (destination == nullptr ||
-        size > std::numeric_limits<std::uint64_t>::max() - guest_address) {
+        !IsValidAccessRange(guest_address, static_cast<std::uint64_t>(size))) {
         return false;
     }
 
@@ -82,7 +100,7 @@ bool SparseGuestMemory::Read(std::uint64_t guest_address, void* destination,
         const std::uint64_t page_address = cursor & ~kPageMask;
         const auto page = pages_.find(page_address);
         if (page == pages_.end() ||
-            (page->second.permissions & kMemoryRead) == 0) {
+            (page->second.permissions & permission) == 0) {
             return false;
         }
         const std::uint64_t page_end = page_address + kPageSize;
@@ -110,8 +128,7 @@ bool SparseGuestMemory::Read(std::uint64_t guest_address, void* destination,
 bool SparseGuestMemory::Write(std::uint64_t guest_address, const void* data,
                               std::size_t size) {
     if (size == 0) return true;
-    if (data == nullptr ||
-        size > std::numeric_limits<std::uint64_t>::max() - guest_address) {
+    if (data == nullptr || !IsValidAccessRange(guest_address, size)) {
         return false;
     }
 
@@ -149,7 +166,7 @@ bool SparseGuestMemory::Write(std::uint64_t guest_address, const void* data,
 bool SparseGuestMemory::Zero(std::uint64_t guest_address,
                              std::uint64_t size) {
     if (size == 0) return true;
-    if (size > std::numeric_limits<std::uint64_t>::max() - guest_address) {
+    if (!IsValidAccessRange(guest_address, size)) {
         return false;
     }
 
