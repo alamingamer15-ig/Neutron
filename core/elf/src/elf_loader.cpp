@@ -157,7 +157,11 @@ bool ElfLoader::Load(const std::vector<std::uint8_t>& file_bytes,
             ++next;
         }
         const Mapping mapping{start, end - start, permissions};
-        if (!guest_memory.Map(mapping.address, mapping.size, mapping.permissions)) {
+        // Keep pages writable while the loader initializes file data and BSS.
+        // The ELF's exact permissions are installed in the Protect pass below.
+        constexpr std::uint32_t kLoaderWritePermissions =
+            memory::kMemoryRead | memory::kMemoryWrite;
+        if (!guest_memory.Map(mapping.address, mapping.size, kLoaderWritePermissions)) {
             RollBack(guest_memory, mappings);
             SetError(error, LoadErrorCode::MappingFailure,
                      "Guest memory rejected a PT_LOAD mapping");
