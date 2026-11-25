@@ -74,6 +74,7 @@ bool ElfLoader::Load(const std::vector<std::uint8_t>& file_bytes,
 
     std::uint64_t minimum_page = std::numeric_limits<std::uint64_t>::max();
     std::uint64_t maximum_page = 0;
+    std::vector<std::pair<std::uint64_t, std::uint64_t>> segment_ranges;
     for (const std::size_t index : elf.load_segment_indices) {
         if (index >= elf.program_headers.size()) {
             SetError(error, LoadErrorCode::InvalidSegment,
@@ -98,8 +99,22 @@ bool ElfLoader::Load(const std::vector<std::uint8_t>& file_bytes,
                      "PT_LOAD page range overflows");
             return false;
         }
+        const std::uint64_t segment_end = segment.virtual_address + segment.memory_size;
+        segment_ranges.emplace_back(segment.virtual_address, segment_end);
         minimum_page = std::min(minimum_page, start);
         maximum_page = std::max(maximum_page, end);
+    }
+
+    // PT_LOAD byte ranges may share a mapped page, but their actual memory
+    // contents must not overlap: otherwise BSS zeroing or a later segment copy
+    // could silently overwrite another segment's initialized bytes.
+    std::sort(segment_ranges.begin(), segment_ranges.end());
+    for (std::size_t i = 1; i < segment_ranges.size(); ++i) {
+        if (segment_ranges[i].first < segment_ranges[i - 1].second) {
+            SetError(error, LoadErrorCode::InvalidSegment,
+                     "PT_LOAD memory ranges overlap");
+            return false;
+        }
     }
 
     if (minimum_page == std::numeric_limits<std::uint64_t>::max() ||
