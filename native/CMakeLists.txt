@@ -1,15 +1,12 @@
 cmake_minimum_required(VERSION 3.22.1)
 project(neutron_native LANGUAGES C CXX)
-
 include(FetchContent)
-
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Neutron only needs decoding and formatting at this stage.
 set(ZYDIS_BUILD_SHARED_LIB OFF CACHE BOOL "" FORCE)
 set(ZYDIS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(ZYDIS_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
@@ -20,7 +17,6 @@ set(ZYDIS_FEATURE_DECODER ON CACHE BOOL "" FORCE)
 set(ZYDIS_FEATURE_FORMATTER ON CACHE BOOL "" FORCE)
 set(ZYDIS_FEATURE_ENCODER OFF CACHE BOOL "" FORCE)
 set(ZYDIS_FEATURE_KNC OFF CACHE BOOL "" FORCE)
-
 FetchContent_Declare(
     zydis
     GIT_REPOSITORY https://github.com/zyantific/zydis.git
@@ -30,7 +26,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(zydis)
 
-# Oboe provides the Android low-latency output stream.
+# Oboe supplies Android's low-latency native audio output.
 set(OBOE_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(OBOE_BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
@@ -44,27 +40,16 @@ FetchContent_MakeAvailable(oboe)
 add_library(neutron_native SHARED
     src/zydis_decoder.cpp
     src/audio_jni.cpp
-    src/../core/audio/src/audio_output.cpp
+    ../core/audio/src/audio_output.cpp
     ../core/elf/src/elf_parser.cpp
     ../core/elf/src/elf_validator.cpp
     src/logging/logger.cpp
     src/neutron_jni.cpp
 )
-
-target_include_directories(neutron_native
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../core/audio/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../core/elf/include
+target_include_directories(neutron_native PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../core/audio/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../core/elf/include
 )
-
-target_link_libraries(neutron_native
-    PRIVATE
-        Zydis
-        oboe
-)
-
-target_compile_options(neutron_native PRIVATE
-    -Wall
-    -Wextra
-)
+target_link_libraries(neutron_native PRIVATE Zydis oboe)
+target_compile_options(neutron_native PRIVATE -Wall -Wextra)

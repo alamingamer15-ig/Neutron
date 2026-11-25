@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <vector>
 namespace neutron::audio {
 class AudioOutput final : public oboe::AudioStreamDataCallback {
@@ -25,6 +26,7 @@ public:
 private:
     void ClearQueue() noexcept;
     std::vector<float> ring_;
+    std::mutex producer_mutex_;
     alignas(64) std::atomic<std::uint64_t> write_frame_{0};
     alignas(64) std::atomic<std::uint64_t> read_frame_{0};
     std::shared_ptr<oboe::AudioStream> stream_;

@@ -8,7 +8,6 @@ AudioOutput::~AudioOutput() { Stop(); }
 bool AudioOutput::Start(std::int32_t sample_rate) {
     if (sample_rate != 44100 && sample_rate != 48000) return false;
     Stop();
-    ClearQueue();
     oboe::AudioStreamBuilder builder;
     builder.setDirection(oboe::Direction::Output)
         ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
@@ -35,6 +34,7 @@ void AudioOutput::Stop() noexcept {
         stream_->close();
         stream_.reset();
     }
+    std::lock_guard<std::mutex> lock(producer_mutex_);
     ClearQueue();
 }
 
@@ -45,7 +45,9 @@ bool AudioOutput::IsRunning() const noexcept {
 std::size_t AudioOutput::WritePcm16(const std::int16_t* samples,
                                     std::size_t frames,
                                     std::uint32_t channels) noexcept {
-    if (!samples || (channels != 1 && channels != 2) || !IsRunning()) return 0;
+    if (!samples || (channels != 1 && channels != 2)) return 0;
+    std::lock_guard<std::mutex> lock(producer_mutex_);
+    if (!IsRunning()) return 0;
     const std::uint64_t write = write_frame_.load(std::memory_order_relaxed);
     const std::uint64_t read = read_frame_.load(std::memory_order_acquire);
     const std::size_t free_frames = kCapacityFrames -
