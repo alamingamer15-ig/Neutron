@@ -15,7 +15,7 @@ permissions:
 
 concurrency:
   group: neutron-rootfs-main
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build-rootfs:
