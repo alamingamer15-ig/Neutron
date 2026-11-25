@@ -68,6 +68,6 @@ documented changes adjust `set_robust_list` and `rseq` handling and patch the
 resolver configuration path. The exact source and patch notes are available in
 the pinned upstream repository: [glibc source archive](https://github.com/jjtseng93/glibc-for-android-native/blob/d7e375f9145b2041f479416eccfc924fd3bde3d6/glibc-2.42.9-revised.tar.gz),
 [SOURCE_INFO](https://github.com/jjtseng93/glibc-for-android-native/blob/d7e375f9145b2041f479416eccfc924fd3bde3d6/SOURCE_INFO),
-and [LGPL-2.1 license](https://github.com/jjtseng93/glibc-for-android-native/blob/d7e375f9145b2041f479416eccfc924fd3bde3d6/LICENSE).
+and [LGPL-2.1 license](https://github.com/jjtseng93/glibc-for-android-native/blob/d7e375f9145b2041f479416eccfc924fd3bde3d6/LICENSE). A copy of the license and the upstream patch notes are also retained under `licenses/` in this repository.
 The build downloads only pinned artifacts and verifies their Git blob object
 IDs before packaging. The loader and libraries remain under the GNU LGPL terms.
