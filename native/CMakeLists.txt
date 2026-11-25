@@ -30,8 +30,21 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(zydis)
 
+# Oboe provides the Android low-latency output stream.
+set(OBOE_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(OBOE_BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    oboe
+    GIT_REPOSITORY https://github.com/google/oboe.git
+    GIT_TAG 1.9.3
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(oboe)
+
 add_library(neutron_native SHARED
     src/zydis_decoder.cpp
+    src/audio_jni.cpp
+    src/../core/audio/src/audio_output.cpp
     ../core/elf/src/elf_parser.cpp
     ../core/elf/src/elf_validator.cpp
     src/logging/logger.cpp
@@ -41,12 +54,14 @@ add_library(neutron_native SHARED
 target_include_directories(neutron_native
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../core/audio/include
         ${CMAKE_CURRENT_SOURCE_DIR}/../core/elf/include
 )
 
 target_link_libraries(neutron_native
     PRIVATE
         Zydis
+        oboe
 )
 
 target_compile_options(neutron_native PRIVATE
