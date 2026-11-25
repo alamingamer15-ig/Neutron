@@ -193,6 +193,30 @@ void TestRollbackOnMappingConflict() {
     assert(memory.Read(0x402000, &byte, 1));
 }
 
+void TestRejectOverlappingLoadSegments() {
+    using namespace neutron::elf;
+    using namespace neutron::memory;
+
+    const auto bytes = MakeElf(
+        kEtExec, 0x400100,
+        {
+            {0, 0x400000, 0x1000, 0x2000, kPfRead | kPfExecute},
+            {0x2000, 0x401000, 0x1000, 0x1000, kPfRead}
+        },
+        0x3000);
+
+    ParsedElf parsed;
+    ParseError parse_error;
+    assert(ElfParser::Parse(bytes, &parsed, &parse_error));
+
+    SparseGuestMemory memory(16 * 1024);
+    LoadedImage image;
+    LoadError load_error;
+    assert(!ElfLoader::Load(bytes, parsed, memory, &image, &load_error));
+    assert(load_error.code == LoadErrorCode::InvalidSegment);
+    assert(memory.MappedBytes() == 0);
+}
+
 void TestRejectWritableExecutablePage() {
     using namespace neutron::elf;
     using namespace neutron::memory;
@@ -221,6 +245,7 @@ int main() {
     TestStaticExecutableLoad();
     TestPieLoadBias();
     TestRollbackOnMappingConflict();
+    TestRejectOverlappingLoadSegments();
     TestRejectWritableExecutablePage();
     return 0;
 }
