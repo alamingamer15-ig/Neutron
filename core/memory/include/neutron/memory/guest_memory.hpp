@@ -25,6 +25,8 @@ public:
                      std::uint32_t permissions) = 0;
     virtual bool Read(std::uint64_t guest_address, void* destination,
                       std::size_t size) const = 0;
+    virtual bool Fetch(std::uint64_t guest_address, void* destination,
+                       std::size_t size) const = 0;
     virtual bool Write(std::uint64_t guest_address, const void* data,
                        std::size_t size) = 0;
     virtual bool Zero(std::uint64_t guest_address, std::uint64_t size) = 0;
@@ -47,6 +49,8 @@ public:
              std::uint32_t permissions) override;
     bool Read(std::uint64_t guest_address, void* destination,
               std::size_t size) const override;
+    bool Fetch(std::uint64_t guest_address, void* destination,
+               std::size_t size) const override;
     bool Write(std::uint64_t guest_address, const void* data,
                std::size_t size) override;
     bool Zero(std::uint64_t guest_address, std::uint64_t size) override;
@@ -64,6 +68,9 @@ private:
     };
 
     static bool IsValidRange(std::uint64_t address, std::uint64_t size) noexcept;
+    static bool IsValidAccessRange(std::uint64_t address, std::uint64_t size) noexcept;
+    bool ReadWithPermission(std::uint64_t guest_address, void* destination,
+                            std::size_t size, std::uint32_t permission) const;
 
     const std::uint64_t maximum_mapped_bytes_;
     mutable std::mutex mutex_;
