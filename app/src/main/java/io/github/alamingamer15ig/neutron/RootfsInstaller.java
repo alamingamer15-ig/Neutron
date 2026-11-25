@@ -213,7 +213,20 @@ public final class RootfsInstaller {
                 return file;
             }
         }
-        return null;
+
+        // Last-resort discovery: rootfs layouts may put the interpreter in a
+        // multiarch directory (for example usr/aarch64-linux-gnu/lib/).
+        // Only accept a correctly-formed AArch64 ELF with the exact loader name.
+        try (Stream<Path> paths = Files.walk(root.toPath())) {
+            return paths.filter(path -> path.getFileName() != null
+                            && "ld-linux-aarch64.so.1".equals(path.getFileName().toString()))
+                    .map(Path::toFile)
+                    .filter(RootfsInstaller::isAarch64Elf)
+                    .findFirst()
+                    .orElse(null);
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private static boolean isAarch64Elf(File file) {
