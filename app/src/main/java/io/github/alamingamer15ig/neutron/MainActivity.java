@@ -485,7 +485,7 @@ public class MainActivity extends AppCompatActivity {
                 final int status = exitCode;
                 runOnUiThread(() -> {
                     if (!result.isEmpty()) transcript.append(result);
-                    if (status >= 0) transcript.append("[exit ").append(String.valueOf(status)).append("]\n");
+                    if (status >= 0) transcript.append("[exit " + status + "]\n");
                     execute.setEnabled(true);
                 });
             }, "neutron-busybox-command").start();
