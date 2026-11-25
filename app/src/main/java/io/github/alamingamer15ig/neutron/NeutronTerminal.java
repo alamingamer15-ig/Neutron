@@ -18,7 +18,7 @@ public final class NeutronTerminal {
 
     public static String runPlatformDiagnostics(String filesDirectory) {
         String output = nativeRunPlatformDiagnostics(filesDirectory);
-        return output == null ? "Neutron: platform diagnostics bridge failed.\\n" : output;
+        return output == null ? "Neutron: platform diagnostics bridge failed.\n" : output;
     }
 
     public static String runCommand(
