@@ -45,6 +45,7 @@ add_library(neutron_native SHARED
     ../core/elf/src/elf_validator.cpp
     ../core/elf/src/elf_loader.cpp
     ../core/memory/src/guest_memory.cpp
+    ../core/process/src/initial_stack.cpp
     src/logging/logger.cpp
     src/neutron_jni.cpp
 )
@@ -53,6 +54,7 @@ target_include_directories(neutron_native PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../core/audio/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../core/elf/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../core/memory/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../core/process/include
 )
 target_link_libraries(neutron_native PRIVATE Zydis oboe)
 target_compile_options(neutron_native PRIVATE -Wall -Wextra)
