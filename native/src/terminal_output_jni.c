@@ -144,7 +144,7 @@ Java_io_github_alamingamer15ig_neutron_NeutronTerminal_nativeRunCommand(
             char error_text[PATH_MAX + 160];
             int error_length = snprintf(
                     error_text, sizeof(error_text),
-                    "Neutron: execve failed for ARM64 loader '%s': errno=%d (%s)\\n",
+                    "Neutron: execve failed for ARM64 loader '%s': errno=%d (%s)\n",
                     loader, exec_error, strerror(exec_error));
             if (error_length > 0) {
                 size_t bytes = (size_t) error_length;
