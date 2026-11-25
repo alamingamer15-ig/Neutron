@@ -72,12 +72,26 @@ public final class RootfsInstaller {
             return root;
         }
 
+        File parent = root.getParentFile();
+        if (!parent.exists() && !parent.mkdirs()) {
+            throw new IllegalStateException("Cannot create rootfs storage");
+        }
+        File backup = new File(parent, "neutron-aarch64-glibc.previous");
+        // Recover the last known-good installation if the process was stopped
+        // between moving it aside and activating the new staging directory.
+        if (!root.exists() && backup.exists() && !backup.renameTo(root)) {
+            throw new IllegalStateException("Could not recover the previous rootfs installation");
+        }
+        if (root.exists() && backup.exists()) {
+            deleteRecursively(backup.toPath());
+        }
+
         File work = new File(context.getCacheDir(), "rootfs-install");
         if (!work.exists() && !work.mkdirs()) {
             throw new IllegalStateException("Cannot create installer workspace");
         }
         File archive = new File(work, ROOTFS_ARCHIVE + ".part");
-        File staging = new File(root.getParentFile(), "neutron-aarch64-glibc.installing");
+        File staging = new File(parent, "neutron-aarch64-glibc.installing");
         deleteRecursively(staging.toPath());
 
         String expectedHash = readExpectedHash(new URL(BASE_URL + ROOTFS_ARCHIVE + ".sha256"));
@@ -92,18 +106,33 @@ public final class RootfsInstaller {
         }
         extractArchive(archive, staging);
         ensureRuntimePermissions(staging);
-        File parent = root.getParentFile();
-        if (!parent.exists() && !parent.mkdirs()) {
-            throw new IllegalStateException("Cannot create rootfs storage");
+
+        boolean hadPreviousRootfs = root.exists();
+        if (hadPreviousRootfs && !root.renameTo(backup)) {
+            throw new IllegalStateException("Could not preserve the previous rootfs installation");
         }
-        deleteRecursively(root.toPath());
         if (!staging.renameTo(root)) {
+            if (hadPreviousRootfs && !backup.renameTo(root)) {
+                throw new IllegalStateException(
+                        "Could not activate the new rootfs or restore the previous installation");
+            }
             throw new IllegalStateException("Could not activate the extracted rootfs");
         }
-        archive.delete();
 
         if (!isInstalled(context)) {
+            deleteRecursively(root.toPath());
+            if (hadPreviousRootfs && !backup.renameTo(root)) {
+                throw new IllegalStateException(
+                        "New rootfs failed validation and the previous installation could not be restored");
+            }
             throw new IllegalStateException("Rootfs failed ARM64 glibc validation");
+        }
+
+        if (hadPreviousRootfs) {
+            deleteRecursively(backup.toPath());
+        }
+        if (!archive.delete() && archive.exists()) {
+            // A leftover verified download is harmless; installation is already complete.
         }
         return root;
     }
