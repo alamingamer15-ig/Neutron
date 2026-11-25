@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/build-rootfs.yml"
       - "rootfs/buildroot/**"
+      - "scripts/install-android-glibc.sh"
   workflow_dispatch:
 
 permissions:
