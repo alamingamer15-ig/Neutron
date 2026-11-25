@@ -544,6 +544,9 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout.LayoutParams versionParams = params(-1, -2);
         versionParams.topMargin = dp(24);
         content.addView(version, versionParams);
+
+        // Tiny naming-origin Easter egg, intentionally implemented in Kotlin.
+        SettingsEasterEgg.addTo(content, this, dp(28));
         return page;
     }
 
