@@ -107,10 +107,15 @@ bool ParseHeader(const std::vector<std::uint8_t>& bytes, Elf64Header* header,
         SetError(error, ParseErrorCode::InvalidHeader, "Invalid ELF version or ELF header size");
         return false;
     }
+    if (header->program_header_count > kMaximumProgramHeaders) {
+        SetError(error, ParseErrorCode::TooManyProgramHeaders,
+                 "Program-header count exceeds the configured parser limit");
+        return false;
+    }
     if (header->program_header_count == 0 ||
-        header->program_header_count > kMaximumProgramHeaders ||
         header->program_header_entry_size != kProgramHeaderSize) {
-        SetError(error, ParseErrorCode::InvalidProgramHeaderTable, "Invalid or unsupported program-header table dimensions");
+        SetError(error, ParseErrorCode::InvalidProgramHeaderTable,
+                 "Invalid or unsupported program-header table dimensions");
         return false;
     }
 
