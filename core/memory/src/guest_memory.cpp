@@ -40,9 +40,11 @@ bool SparseGuestMemory::Map(std::uint64_t guest_address, std::uint64_t size,
     }
 
     std::lock_guard<std::mutex> lock(mutex_);
-    if (size > maximum_mapped_bytes_ - mapped_bytes_) return false;
+    if (mapped_bytes_ > maximum_mapped_bytes_ ||
+        size > maximum_mapped_bytes_ - mapped_bytes_) return false;
 
     const std::uint64_t page_count = size / kPageSize;
+    if (page_count > std::numeric_limits<std::size_t>::max()) return false;
     for (std::uint64_t i = 0; i < page_count; ++i) {
         const std::uint64_t address = guest_address + i * kPageSize;
         if (pages_.find(address) != pages_.end()) return false;
@@ -63,7 +65,11 @@ bool SparseGuestMemory::Map(std::uint64_t guest_address, std::uint64_t size,
             Page page;
             page.bytes = std::move(bytes);
             page.permissions = permissions;
-            pages_.emplace(address, std::move(page));
+            const auto insertion = pages_.emplace(address, std::move(page));
+            if (!insertion.second) {
+                for (const std::uint64_t mapped : inserted) pages_.erase(mapped);
+                return false;
+            }
             inserted.push_back(address);
         }
     } catch (...) {
