@@ -90,6 +90,21 @@ std::vector<std::uint8_t> MakeElf(
     return bytes;
 }
 
+void TestProgramHeaderLimitError() {
+    using namespace neutron::elf;
+
+    auto bytes = MakeElf(
+        kEtExec, 0x400100,
+        {{0, 0x400000, 0x1000, 0x1000, kPfRead | kPfExecute}},
+        0x1000);
+    Put16(bytes, 56, 4097);
+
+    ParsedElf parsed;
+    ParseError error;
+    assert(!ElfParser::Parse(bytes, &parsed, &error));
+    assert(error.code == ParseErrorCode::TooManyProgramHeaders);
+}
+
 void TestStaticExecutableLoad() {
     using namespace neutron::elf;
     using namespace neutron::memory;
@@ -242,6 +257,7 @@ void TestRejectWritableExecutablePage() {
 } // namespace
 
 int main() {
+    TestProgramHeaderLimitError();
     TestStaticExecutableLoad();
     TestPieLoadBias();
     TestRollbackOnMappingConflict();
