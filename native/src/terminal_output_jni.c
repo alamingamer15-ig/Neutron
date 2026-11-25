@@ -140,8 +140,17 @@ Java_io_github_alamingamer15ig_neutron_NeutronTerminal_nativeRunCommand(
         }
         execve(loader, child_argv, child_envp);
         {
-            static const char error_text[] = "Neutron: execve failed for the ARM64 BusyBox loader\n";
-            (void) write(STDOUT_FILENO, error_text, sizeof(error_text) - 1U);
+            int exec_error = errno;
+            char error_text[PATH_MAX + 160];
+            int error_length = snprintf(
+                    error_text, sizeof(error_text),
+                    "Neutron: execve failed for ARM64 loader '%s': errno=%d (%s)\\n",
+                    loader, exec_error, strerror(exec_error));
+            if (error_length > 0) {
+                size_t bytes = (size_t) error_length;
+                if (bytes >= sizeof(error_text)) bytes = sizeof(error_text) - 1U;
+                (void) write(STDOUT_FILENO, error_text, bytes);
+            }
         }
         _exit(127);
     }
