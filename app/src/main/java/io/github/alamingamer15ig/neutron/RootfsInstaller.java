@@ -70,8 +70,8 @@ public final class RootfsInstaller {
         return install(context, listener, false);
     }
 
-    public static File install(Context context, ProgressListener listener,
-                               boolean forceReinstall) throws Exception {
+    public static synchronized File install(Context context, ProgressListener listener,
+                                              boolean forceReinstall) throws Exception {
         File root = getRootfsDirectory(context);
         if (!forceReinstall && isInstalled(context)) {
             return root;
