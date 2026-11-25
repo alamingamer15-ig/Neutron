@@ -1,6 +1,7 @@
 #include "neutron/elf/elf_loader.hpp"
 
 #include <algorithm>
+#include <iterator>
 #include <limits>
 #include <map>
 #include <utility>
@@ -221,8 +222,9 @@ bool ElfLoader::Load(const std::vector<std::uint8_t>& file_bytes,
                 table_size <= ph.file_size &&
                 elf.header.program_header_offset - ph.offset <= ph.file_size - table_size) {
                 const std::uint64_t delta = elf.header.program_header_offset - ph.offset;
-                if (AddOverflows(load_bias + ph.virtual_address, delta)) break;
-                loaded.program_header_address = load_bias + ph.virtual_address + delta;
+                const std::uint64_t phdr_base = load_bias + ph.virtual_address;
+                if (AddOverflows(phdr_base, delta)) break;
+                loaded.program_header_address = phdr_base + delta;
                 break;
             }
         }
