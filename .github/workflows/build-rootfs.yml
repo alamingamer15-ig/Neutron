@@ -30,7 +30,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential gcc g++ make \
-            libncurses-dev wget cpio unzip rsync bc file python3 perl git
+            libncurses-dev wget cpio unzip rsync bc file python3 perl git curl binutils
 
       - name: Download Buildroot 2026.08.2
         run: |
@@ -42,6 +42,7 @@ jobs:
         run: |
           cp rootfs/buildroot/neutron_aarch64_glibc_defconfig /tmp/buildroot-src/.config
           sudo install -m 0755 rootfs/buildroot/post-build.sh /tmp/neutron-post-build.sh
+          sudo install -m 0755 rootfs/buildroot/install-android-glibc.sh /tmp/install-android-glibc.sh
           make -C /tmp/buildroot-src olddefconfig
 
       - name: Build root filesystem
@@ -56,8 +57,9 @@ jobs:
           cd rootfs/images
           sha256sum neutron-aarch64-glibc.tar.gz > neutron-aarch64-glibc.tar.gz.sha256
           ls -lh neutron-aarch64-glibc.tar.gz
-          tar -tzf neutron-aarch64-glibc.tar.gz | grep -E '^\./?(bin|lib|lib64|home|dev|proc)(/|$)' | head -30
+          tar -tzf neutron-aarch64-glibc.tar.gz | grep -E '^\\./?(bin|lib|lib64|home|dev|proc)(/|$)' | head -30
           tar -xOzf neutron-aarch64-glibc.tar.gz ./etc/neutron-rootfs-release
+          tar -xOzf neutron-aarch64-glibc.tar.gz ./etc/neutron-android-glibc-release
 
       - name: Commit rootfs archive to main
         run: |
@@ -68,7 +70,7 @@ jobs:
             echo "Rootfs archive is already up to date."
             exit 0
           fi
-          git commit -m "Add minimal AArch64 glibc rootfs"
+          git commit -m "Build rootfs with Android-compatible glibc"
           git fetch origin main
           git rebase origin/main
           git push origin HEAD:main
