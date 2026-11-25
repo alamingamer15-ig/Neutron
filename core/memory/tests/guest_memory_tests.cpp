@@ -42,6 +42,10 @@ int main() {
     assert(memory.MappedBytes() == 0);
     assert(!memory.Read(0x1000, output.data(), 1));
 
+    // Unknown permission bits must never enter the guest page table.
+    assert(!memory.Map(0x8000, 4096, 0x80000000u));
+    assert(memory.MappedBytes() == 0);
+
     SparseGuestMemory limited(4096);
     assert(!limited.Map(0x4000, 8192, kMemoryRead | kMemoryWrite));
     assert(limited.MappedBytes() == 0);
