@@ -343,6 +343,7 @@ public class MainActivity extends AppCompatActivity {
         if (!loader.isFile()) {
             loader = new File(rootfs, "lib/ld-linux-aarch64.so.1");
         }
+        final File loaderFile = loader;
         boolean shellReady = RootfsInstaller.isInstalled(this)
                 && busybox.isFile() && loader.isFile();
         ScrollView page = createPage();
@@ -438,7 +439,7 @@ public class MainActivity extends AppCompatActivity {
                 final String result;
                 try {
                     result = NeutronTerminal.runCommand(
-                            loader.getAbsolutePath(),
+                            loaderFile.getAbsolutePath(),
                             busybox.getAbsolutePath(),
                             rootfs.getAbsolutePath(),
                             entered);
