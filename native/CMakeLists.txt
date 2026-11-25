@@ -32,6 +32,8 @@ FetchContent_MakeAvailable(zydis)
 
 add_library(neutron_native SHARED
     src/zydis_decoder.cpp
+    ../core/elf/src/elf_parser.cpp
+    ../core/elf/src/elf_validator.cpp
     src/logging/logger.cpp
     src/neutron_jni.cpp
 )
@@ -39,6 +41,7 @@ add_library(neutron_native SHARED
 target_include_directories(neutron_native
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../core/elf/include
 )
 
 target_link_libraries(neutron_native
