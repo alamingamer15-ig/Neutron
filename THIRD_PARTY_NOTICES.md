@@ -58,3 +58,16 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 \n\n## Apache Commons Compress\n\nNeutron uses Apache Commons Compress 1.27.1 (Apache License 2.0) to safely read the compressed Alpine minirootfs archive.\n
+## Android-compatible GNU C Library (glibc) 2.42.9
+
+Neutron packages the AArch64 dynamic loader and rootfs runtime libraries from
+[jjtseng93/glibc-for-android-native](https://github.com/jjtseng93/glibc-for-android-native),
+pinned to commit `d7e375f9145b2041f479416eccfc924fd3bde3d6`. This is a modified
+GNU C Library build intended to avoid Android app-sandbox SIGSYS failures. Its
+documented changes adjust `set_robust_list` and `rseq` handling and patch the
+resolver configuration path. The exact source and patch notes are available in
+the pinned upstream repository: [glibc source archive](https://github.com/jjtseng93/glibc-for-android-native/blob/d7e375f9145b2041f479416eccfc924fd3bde3d6/glibc-2.42.9-revised.tar.gz),
+[SOURCE_INFO](https://github.com/jjtseng93/glibc-for-android-native/blob/d7e375f9145b2041f479416eccfc924fd3bde3d6/SOURCE_INFO),
+and [LGPL-2.1 license](https://github.com/jjtseng93/glibc-for-android-native/blob/d7e375f9145b2041f479416eccfc924fd3bde3d6/LICENSE).
+The build downloads only pinned artifacts and verifies their Git blob object
+IDs before packaging. The loader and libraries remain under the GNU LGPL terms.
