@@ -48,7 +48,13 @@ case "$MODE" in
             rm -f "$DEST/lib/$library"
             install -m 0755 "$WORK/$library" "$DEST/lib/$library"
         done
-        ln -sfn ../lib/ld-linux-aarch64.so.1 "$DEST/lib64/ld-linux-aarch64.so.1"
+        # Some AArch64 rootfs layouts make /lib64 a symlink to /lib.
+        # Creating /lib64/ld-linux here would then replace the real loader in
+        # /lib with a self-referential symlink. The /lib loader is sufficient
+        # in that layout; only add the compatibility alias for a real directory.
+        if [ ! -L "$DEST/lib64" ]; then
+            ln -sfn ../lib/ld-linux-aarch64.so.1 "$DEST/lib64/ld-linux-aarch64.so.1"
+        fi
         printf '%s\n' \
             "glibc 2.42.9 Android sandbox patch set" \
             "Upstream: https://github.com/jjtseng93/glibc-for-android-native" \
