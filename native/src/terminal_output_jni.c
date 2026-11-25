@@ -1,9 +1,8 @@
+#define _POSIX_C_SOURCE 200809L
 #include <jni.h>
 
 #include <errno.h>
 #include <limits.h>
-#include <poll.h>
-#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -80,11 +79,11 @@ Java_io_github_alamingamer15ig_neutron_NeutronTerminal_nativeRunCommand(
         return NULL;
     }
 
-    const size_t path_capacity = strlen(rootfs) * 3U + 64U;
+    const size_t path_capacity = strlen(rootfs) * 6U + 128U;
     char *home = (char *) malloc(path_capacity);
     char *library_path = (char *) malloc(path_capacity);
     char *home_env = (char *) malloc(path_capacity + 8U);
-    char *path_env = strdup("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
+    char *path_env = (char *) malloc(path_capacity + 8U);
     char *user_env = strdup("USER=neutron");
     char *term_env = strdup("TERM=xterm-256color");
     char *lang_env = strdup("LANG=C.UTF-8");
@@ -102,6 +101,9 @@ Java_io_github_alamingamer15ig_neutron_NeutronTerminal_nativeRunCommand(
     (void) snprintf(library_path, path_capacity, "%s/lib:%s/usr/lib:%s/lib64",
                     rootfs, rootfs, rootfs);
     (void) snprintf(home_env, path_capacity + 8U, "HOME=%s", home);
+    (void) snprintf(path_env, path_capacity + 8U,
+                    "PATH=%s/usr/local/sbin:%s/usr/local/bin:%s/usr/sbin:%s/usr/bin:%s/sbin:%s/bin",
+                    rootfs, rootfs, rootfs, rootfs, rootfs, rootfs);
 
     char *const child_argv[] = {
         loader, (char *) "--library-path", library_path,
