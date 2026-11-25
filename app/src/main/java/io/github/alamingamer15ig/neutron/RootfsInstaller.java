@@ -83,7 +83,17 @@ public final class RootfsInstaller {
             throw new IllegalStateException("Could not recover the previous rootfs installation");
         }
         if (root.exists() && backup.exists()) {
-            deleteRecursively(backup.toPath());
+            if (isInstalled(context)) {
+                deleteRecursively(backup.toPath());
+            } else {
+                deleteRecursively(root.toPath());
+                if (!backup.renameTo(root)) {
+                    throw new IllegalStateException("Could not recover the previous rootfs installation");
+                }
+                if (isInstalled(context)) {
+                    return root;
+                }
+            }
         }
 
         File work = new File(context.getCacheDir(), "rootfs-install");
