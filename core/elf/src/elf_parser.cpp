@@ -2,6 +2,7 @@
 #include "neutron/elf/elf_validator.hpp"
 
 #include <limits>
+#include <utility>
 
 namespace neutron::elf {
 namespace {
