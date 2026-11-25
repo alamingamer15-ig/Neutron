@@ -58,6 +58,10 @@ public final class RootfsInstaller {
                 && new File(root, "proc").isDirectory() && new File(root, "proc").canExecute()
                 && new File(root, "etc/neutron-rootfs-release").isFile()
                 && new File(root, "etc/neutron-android-glibc-release").isFile()
+                && isAarch64Elf(new File(root, "lib/libc.so.6"))
+                && isAarch64Elf(new File(root, "lib/libdl.so.2"))
+                && isAarch64Elf(new File(root, "lib/libm.so.6"))
+                && isAarch64Elf(new File(root, "lib/libpthread.so.0"))
                 && loader
                 && isAarch64Elf(busyboxFile) && busyboxFile.canExecute();
     }
