@@ -46,8 +46,7 @@ public final class RootfsInstaller {
 
     public static boolean isInstalled(Context context) {
         File root = getRootfsDirectory(context);
-        File loaderFile = new File(root, "lib64/ld-linux-aarch64.so.1");
-        if (!loaderFile.isFile()) loaderFile = new File(root, "lib/ld-linux-aarch64.so.1");
+        File loaderFile = findLoader(root);
         File busyboxFile = new File(root, "bin/busybox");
         boolean loader = isAarch64Elf(loaderFile) && loaderFile.canExecute();
         return root.isDirectory() && root.canExecute()
@@ -167,9 +166,21 @@ public final class RootfsInstaller {
         }
 
         File busybox = new File(root, "bin/busybox");
-        File loader = new File(root, "lib64/ld-linux-aarch64.so.1");
-        if (!loader.isFile()) {
-            loader = new File(root, "lib/ld-linux-aarch64.so.1");
+        File loader = findLoader(root);
+        if (loader == null) {
+            throw new IllegalStateException(
+                    "Required ARM64 executable is missing: expected ld-linux-aarch64.so.1 "
+                    + "under lib/, lib64/, usr/lib/, or usr/lib64/");
+        }
+        // Normalize the loader location for the rest of Neutron. Some rootfs
+        // builds place the interpreter under /usr/lib; keep a stable /lib path.
+        File canonicalLoader = new File(root, "lib/ld-linux-aarch64.so.1");
+        if (!canonicalLoader.isFile() && !loader.equals(canonicalLoader)) {
+            Files.createDirectories(canonicalLoader.toPath().getParent());
+            Files.copy(loader.toPath(), canonicalLoader.toPath());
+            canonicalLoader.setReadable(true, false);
+            canonicalLoader.setExecutable(true, false);
+            loader = canonicalLoader;
         }
         File[] executables = {busybox, loader};
         for (File executable : executables) {
@@ -186,6 +197,22 @@ public final class RootfsInstaller {
                         "ARM64 executable permission verification failed: " + executable.getPath());
             }
         }
+    }
+
+    private static File findLoader(File root) {
+        String[] candidates = {
+                "lib64/ld-linux-aarch64.so.1",
+                "lib/ld-linux-aarch64.so.1",
+                "usr/lib64/ld-linux-aarch64.so.1",
+                "usr/lib/ld-linux-aarch64.so.1"
+        };
+        for (String candidate : candidates) {
+            File file = new File(root, candidate);
+            if (isAarch64Elf(file)) {
+                return file;
+            }
+        }
+        return null;
     }
 
     private static boolean isAarch64Elf(File file) {
