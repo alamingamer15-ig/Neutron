@@ -193,6 +193,28 @@ EOF
     fi
 done
 
+# APT starts its download/authentication helpers as separate ELF processes.
+# Give those helpers Android-executable wrapper paths too.
+mkdir -p "$DEST/libexec/apt-methods"
+for binary in "$DEST"/usr/lib/apt/methods/*; do
+    [ -e "$binary" ] || continue
+    if readelf -h "$binary" 2>/dev/null | grep -q 'Machine:.*AArch64'; then
+        command="${binary##*/}"
+        cat > "$DEST/libexec/apt-methods/$command" <<EOF
+#!/system/bin/sh
+exec "\$PREFIX/bin/neutron-exec" "/usr/lib/apt/methods/$command" "\$@"
+EOF
+        chmod 0755 "$DEST/libexec/apt-methods/$command"
+    fi
+done
+if [ -x "$DEST/usr/lib/apt/apt-helper" ]; then
+    cat > "$DEST/bin/apt-helper" <<'EOF'
+#!/system/bin/sh
+exec "$PREFIX/bin/neutron-exec" /usr/lib/apt/apt-helper "$@"
+EOF
+    chmod 0755 "$DEST/bin/apt-helper"
+fi
+
 # apt/dpkg must operate inside Neutron's private prefix, never Android's root.
 cat > "$DEST/bin/apt-get" <<'EOF'
 #!/system/bin/sh
@@ -206,7 +228,9 @@ exec "$PREFIX/bin/neutron-exec" apt-get -o "Dir::Root=$PREFIX" \
     -o "Dir::Etc::sourceparts=-" \
     -o "Dir::Etc::parts=-" \
     -o "Dir::Bin::dpkg=$PREFIX/bin/dpkg" \
-    -o "Dir::Bin::Methods=$PREFIX/usr/lib/apt/methods" "$@"
+    -o "Dir::Bin::Methods=$PREFIX/libexec/apt-methods" \
+    -o "Dir::Bin::gpgv=$PREFIX/bin/gpgv" \
+    -o "Dir::Bin::apt-helper=$PREFIX/bin/apt-helper" "$@"
 EOF
 cat > "$DEST/bin/apt" <<'EOF'
 #!/system/bin/sh
@@ -220,7 +244,9 @@ exec "$PREFIX/bin/neutron-exec" apt -o "Dir::Root=$PREFIX" \
     -o "Dir::Etc::sourceparts=-" \
     -o "Dir::Etc::parts=-" \
     -o "Dir::Bin::dpkg=$PREFIX/bin/dpkg" \
-    -o "Dir::Bin::Methods=$PREFIX/usr/lib/apt/methods" "$@"
+    -o "Dir::Bin::Methods=$PREFIX/libexec/apt-methods" \
+    -o "Dir::Bin::gpgv=$PREFIX/bin/gpgv" \
+    -o "Dir::Bin::apt-helper=$PREFIX/bin/apt-helper" "$@"
 EOF
 cat > "$DEST/bin/apt-cache" <<'EOF'
 #!/system/bin/sh
@@ -233,7 +259,9 @@ exec "$PREFIX/bin/neutron-exec" apt-cache -o "Dir::Root=$PREFIX" \
     -o "Dir::Etc::sourcelist=$PREFIX/etc/apt/sources.list" \
     -o "Dir::Etc::sourceparts=-" \
     -o "Dir::Etc::parts=-" \
-    -o "Dir::Bin::Methods=$PREFIX/usr/lib/apt/methods" "$@"
+    -o "Dir::Bin::Methods=$PREFIX/libexec/apt-methods" \
+    -o "Dir::Bin::gpgv=$PREFIX/bin/gpgv" \
+    -o "Dir::Bin::apt-helper=$PREFIX/bin/apt-helper" "$@"
 EOF
 cat > "$DEST/bin/dpkg" <<'EOF'
 #!/system/bin/sh
