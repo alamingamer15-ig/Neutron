@@ -91,12 +91,29 @@ for package in "$STAGE"/debs/*.deb; do
     if [ "$name" = libc6 ] || [ "$name" = libc-bin ]; then
         # Record the host-provided patched glibc as installed without unpacking
         # Ubuntu's libc over Neutron's Android-compatible runtime.
-        dpkg-deb -f "$package" >> "$DEST/var/lib/dpkg/status"
+        if [ "$name" = libc6 ]; then
+            dpkg-deb -f "$package" | sed 's/^Version: .*/Version: 2.42.9-neutron1/' \
+                >> "$DEST/var/lib/dpkg/status"
+        else
+            dpkg-deb -f "$package" >> "$DEST/var/lib/dpkg/status"
+        fi
         printf 'Status: install ok installed\n\n' >> "$DEST/var/lib/dpkg/status"
         continue
     fi
     printf '%s %s %s\n' "$name" "$version" "$architecture" >> "$PACKAGE_LIST"
     dpkg-deb -x "$package" "$DEST"
+    # Populate dpkg's file ownership database and preserve package maintainer
+    # metadata so future upgrades/removals can be managed by Neutron's dpkg.
+    dpkg-deb --fsys-tarfile "$package" | tar -tf - \
+        | sed -e 's#^\\./##' -e 's#^#/#' \
+        > "$DEST/var/lib/dpkg/info/$name.list"
+    CONTROL_DIR="$STAGE/control-$name"
+    mkdir -p "$CONTROL_DIR"
+    dpkg-deb -e "$package" "$CONTROL_DIR"
+    for control_file in "$CONTROL_DIR"/*; do
+        [ -f "$control_file" ] || continue
+        cp "$control_file" "$DEST/var/lib/dpkg/info/$name.${control_file##*/}"
+    done
     # Seed dpkg's database for the packages included in the offline bootstrap.
     dpkg-deb -f "$package" >> "$DEST/var/lib/dpkg/status"
     printf 'Status: install ok installed\n\n' >> "$DEST/var/lib/dpkg/status"
