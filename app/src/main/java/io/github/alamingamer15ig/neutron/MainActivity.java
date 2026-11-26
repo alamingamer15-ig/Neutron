@@ -378,6 +378,43 @@ public class MainActivity extends AppCompatActivity {
             return page;
         }
 
+        if (!NeutronBootstrapInstaller.isInstalled(environment)) {
+            TextView installStatus = text(
+                    "Preparing Neutron's Linux environment… This is a one-time offline installation.",
+                    13, R.color.neutron_muted, false);
+            LinearLayout.LayoutParams installStatusParams = params(-1, -2);
+            installStatusParams.topMargin = dp(12);
+            page.addView(installStatus, installStatusParams);
+
+            Context appContext = getApplicationContext();
+            new Thread(() -> {
+                String failure = null;
+                try {
+                    NeutronBootstrapInstaller.install(appContext);
+                    if (!NeutronBootstrapInstaller.isInstalled(
+                            NeutronEnvironment.initialize(appContext))) {
+                        throw new IOException("Bootstrap verification failed after installation");
+                    }
+                } catch (Exception error) {
+                    failure = error.getClass().getSimpleName() + ": "
+                            + String.valueOf(error.getMessage());
+                }
+                final String installError = failure;
+                runOnUiThread(() -> {
+                    if (isFinishing() || page.getParent() == null) return;
+                    if (installError == null) {
+                        Toast.makeText(MainActivity.this,
+                                "Neutron Linux environment installed", Toast.LENGTH_SHORT).show();
+                        showScreen(R.id.nav_terminal);
+                    } else {
+                        installStatus.setText("Environment installation failed: " + installError
+                                + "\nOpen Settings to retry the bootstrap installation.");
+                    }
+                });
+            }, "neutron-terminal-bootstrap").start();
+            return page;
+        }
+
         try {
             terminalView = view;
             terminalClient = new NeutronTermuxTerminalClient(this, view);
@@ -385,11 +422,8 @@ public class MainActivity extends AppCompatActivity {
 
             String prefix = environment.getRootDirectory().getAbsolutePath();
             String home = environment.getHomeDirectory().getAbsolutePath();
-            boolean bootstrapInstalled = NeutronBootstrapInstaller.isInstalled(environment);
-            String shellPath = bootstrapInstalled
-                    ? prefix + "/neutron-bin/bash" : "/system/bin/sh";
-            String[] shellArgs = bootstrapInstalled
-                    ? new String[]{"-l", "-i"} : new String[]{"/system/bin/sh", "-i"};
+            String shellPath = prefix + "/neutron-bin/bash";
+            String[] shellArgs = new String[]{"-l", "-i"};
             String[] shellEnvironment = {
                     "HOME=" + home,
                     "PREFIX=" + prefix,
