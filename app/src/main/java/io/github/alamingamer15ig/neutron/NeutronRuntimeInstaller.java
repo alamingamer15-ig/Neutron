@@ -115,18 +115,35 @@ public final class NeutronRuntimeInstaller {
 
                 if (entry.isSymbolicLink()) {
                     String linkName = entry.getLinkName();
-                    if (linkName == null || linkName.isEmpty()
-                            || new File(linkName).isAbsolute()) {
-                        throw new IOException("Unsafe absolute runtime symlink: " + name);
+                    if (linkName == null || linkName.isEmpty()) {
+                        throw new IOException("Invalid runtime symlink: " + name);
                     }
-                    Path target = Paths.get(output.getParent()).resolve(linkName).normalize();
-                    if (!target.toFile().getCanonicalPath()
-                            .startsWith(stagingPath + File.separator)) {
+
+                    // Linux packages commonly use absolute links such as
+                    // /etc/ssl/private. Inside Neutron these must resolve from
+                    // the private prefix, never from Android's filesystem root.
+                    Path stagingRoot = Paths.get(stagingPath).normalize();
+                    Path outputPath = output.toPath().toAbsolutePath().normalize();
+                    Path target;
+                    try {
+                        Path rawLink = Paths.get(linkName);
+                        target = rawLink.isAbsolute()
+                                ? stagingRoot.resolve(rawLink.toString().substring(1)).normalize()
+                                : outputPath.getParent().resolve(rawLink).normalize();
+                    } catch (Exception invalidLink) {
+                        throw new IOException("Invalid runtime symlink: " + name, invalidLink);
+                    }
+
+                    if (!target.startsWith(stagingRoot) || target.equals(stagingRoot)) {
                         throw new IOException("Runtime symlink escapes prefix: " + name);
                     }
+
+                    // Store a relative link so it remains valid after the
+                    // staging tree is moved into PREFIX.
+                    String safeLink = outputPath.getParent().relativize(target).toString();
                     if (output.exists() || isSymlink(output)) output.delete();
                     try {
-                        Os.symlink(linkName, output.getAbsolutePath());
+                        Os.symlink(safeLink, output.getAbsolutePath());
                     } catch (Exception error) {
                         throw new IOException("Could not create runtime symlink: " + name, error);
                     }
