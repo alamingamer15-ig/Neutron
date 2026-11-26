@@ -56,4 +56,6 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'com.google.android.material:material:1.12.0'
     implementation 'org.apache.commons:commons-compress:1.27.1'
+    // Termux's reusable terminal UI and emulator (Apache-2.0 libraries).
+    implementation 'com.termux.termux-app:terminal-view:0.118.0'
 }
