@@ -75,7 +75,7 @@ sh "$ROOT/scripts/install-android-glibc.sh" runtime "$DEST/glibc"
 
 mkdir -p "$STAGE/debs" "$DEST/var/lib/dpkg/updates" "$DEST/var/lib/dpkg/info" \
     "$DEST/var/lib/apt/lists/partial" "$DEST/var/cache/apt/archives/partial" \
-    "$DEST/var/log/apt" "$DEST/etc/apt" "$DEST/bin"
+    "$DEST/var/log/apt" "$DEST/etc/apt" "$DEST/neutron-bin"
 find /var/cache/apt/archives -maxdepth 1 -type f -name '*.deb' -exec cp {} "$STAGE/debs/" \;
 PACKAGE_LIST="$DEST/usr/share/neutron/runtime-packages.txt"
 BOOTSTRAP_LIST="$DEST/usr/share/neutron/bootstrap-packages.txt"
@@ -148,7 +148,7 @@ Acquire::Languages "none";
 Acquire::Retries "3";
 EOF
 
-cat > "$DEST/bin/neutron-exec" <<'EOF'
+cat > "$DEST/neutron-bin/neutron-exec" <<'EOF'
 #!/system/bin/sh
 set -eu
 : "${PREFIX:?Neutron PREFIX is not set}"
@@ -167,15 +167,25 @@ case "$PROGRAM" in
 esac
 exec "$LOADER" --library-path "$LIBPATH" "$PROGRAM" "$@"
 EOF
-chmod 0755 "$DEST/bin/neutron-exec"
+chmod 0755 "$DEST/neutron-bin/neutron-exec"
 
 # Neutron uses an explicit loader library path, so Android's restricted
 # environment does not need a system-wide ldconfig cache.
-cat > "$DEST/bin/ldconfig" <<'EOF'
+cat > "$DEST/neutron-bin/ldconfig" <<'EOF'
 #!/system/bin/sh
 exit 0
 EOF
-chmod 0755 "$DEST/bin/ldconfig"
+chmod 0755 "$DEST/neutron-bin/ldconfig"
+
+# Ubuntu's usrmerge layout provides /bin -> /usr/bin. Keep that symlink
+# for dpkg ownership and place Android loader wrappers in neutron-bin instead.
+if [ -e "$DEST/bin" ] && [ ! -L "$DEST/bin" ]; then
+    rm -rf "$DEST/bin"
+fi
+if [ ! -L "$DEST/bin" ]; then
+    ln -s usr/bin "$DEST/bin"
+fi
+mkdir -p "$DEST/neutron-bin"
 
 # Create Android-shell launch wrappers for every bundled ARM64 ELF command.
 # Direct execution would fail because Ubuntu's PT_INTERP path is not present
@@ -184,12 +194,12 @@ for binary in "$DEST"/usr/bin/* "$DEST"/usr/sbin/*; do
     [ -e "$binary" ] || continue
     if readelf -h "$binary" 2>/dev/null | grep -q 'Machine:.*AArch64'; then
         command="${binary##*/}"
-        [ -e "$DEST/bin/$command" ] && continue
-        cat > "$DEST/bin/$command" <<EOF
+        [ -e "$DEST/neutron-bin/$command" ] && continue
+        cat > "$DEST/neutron-bin/$command" <<EOF
 #!/system/bin/sh
 exec "\$PREFIX/bin/neutron-exec" "$command" "\$@"
 EOF
-        chmod 0755 "$DEST/bin/$command"
+        chmod 0755 "$DEST/neutron-bin/$command"
     fi
 done
 
@@ -208,51 +218,51 @@ EOF
     fi
 done
 if [ -x "$DEST/usr/lib/apt/apt-helper" ]; then
-    cat > "$DEST/bin/apt-helper" <<'EOF'
+    cat > "$DEST/neutron-bin/apt-helper" <<'EOF'
 #!/system/bin/sh
-exec "$PREFIX/bin/neutron-exec" /usr/lib/apt/apt-helper "$@"
+exec "$PREFIX/neutron-bin/neutron-exec" /usr/lib/apt/apt-helper "$@"
 EOF
-    chmod 0755 "$DEST/bin/apt-helper"
+    chmod 0755 "$DEST/neutron-bin/apt-helper"
 fi
 
 # apt/dpkg must operate inside Neutron's private prefix, never Android's root.
-cat > "$DEST/bin/apt-get" <<'EOF'
+cat > "$DEST/neutron-bin/apt-get" <<'EOF'
 #!/system/bin/sh
 : "${PREFIX:?}"
 export APT_CONFIG="$PREFIX/etc/apt/apt.conf"
-exec "$PREFIX/bin/neutron-exec" apt-get -o "Dir::Root=$PREFIX" \
+exec "$PREFIX/neutron-bin/neutron-exec" apt-get -o "Dir::Root=$PREFIX" \
     -o "Dir::State::status=$PREFIX/var/lib/dpkg/status" \
     -o "Dir::State::lists=$PREFIX/var/lib/apt/lists" \
     -o "Dir::Cache=$PREFIX/var/cache/apt" \
     -o "Dir::Etc::sourcelist=$PREFIX/etc/apt/sources.list" \
     -o "Dir::Etc::sourceparts=-" \
     -o "Dir::Etc::parts=-" \
-    -o "Dir::Bin::dpkg=$PREFIX/bin/dpkg" \
+    -o "Dir::Bin::dpkg=$PREFIX/neutron-bin/dpkg" \
     -o "Dir::Bin::Methods=$PREFIX/libexec/apt-methods" \
     -o "Dir::Bin::gpgv=$PREFIX/bin/gpgv" \
     -o "Dir::Bin::apt-helper=$PREFIX/bin/apt-helper" "$@"
 EOF
-cat > "$DEST/bin/apt" <<'EOF'
+cat > "$DEST/neutron-bin/apt" <<'EOF'
 #!/system/bin/sh
 : "${PREFIX:?}"
 export APT_CONFIG="$PREFIX/etc/apt/apt.conf"
-exec "$PREFIX/bin/neutron-exec" apt -o "Dir::Root=$PREFIX" \
+exec "$PREFIX/neutron-bin/neutron-exec" apt -o "Dir::Root=$PREFIX" \
     -o "Dir::State::status=$PREFIX/var/lib/dpkg/status" \
     -o "Dir::State::lists=$PREFIX/var/lib/apt/lists" \
     -o "Dir::Cache=$PREFIX/var/cache/apt" \
     -o "Dir::Etc::sourcelist=$PREFIX/etc/apt/sources.list" \
     -o "Dir::Etc::sourceparts=-" \
     -o "Dir::Etc::parts=-" \
-    -o "Dir::Bin::dpkg=$PREFIX/bin/dpkg" \
+    -o "Dir::Bin::dpkg=$PREFIX/neutron-bin/dpkg" \
     -o "Dir::Bin::Methods=$PREFIX/libexec/apt-methods" \
     -o "Dir::Bin::gpgv=$PREFIX/bin/gpgv" \
     -o "Dir::Bin::apt-helper=$PREFIX/bin/apt-helper" "$@"
 EOF
-cat > "$DEST/bin/apt-cache" <<'EOF'
+cat > "$DEST/neutron-bin/apt-cache" <<'EOF'
 #!/system/bin/sh
 : "${PREFIX:?}"
 export APT_CONFIG="$PREFIX/etc/apt/apt.conf"
-exec "$PREFIX/bin/neutron-exec" apt-cache -o "Dir::Root=$PREFIX" \
+exec "$PREFIX/neutron-bin/neutron-exec" apt-cache -o "Dir::Root=$PREFIX" \
     -o "Dir::State::status=$PREFIX/var/lib/dpkg/status" \
     -o "Dir::State::lists=$PREFIX/var/lib/apt/lists" \
     -o "Dir::Cache=$PREFIX/var/cache/apt" \
@@ -263,23 +273,23 @@ exec "$PREFIX/bin/neutron-exec" apt-cache -o "Dir::Root=$PREFIX" \
     -o "Dir::Bin::gpgv=$PREFIX/bin/gpgv" \
     -o "Dir::Bin::apt-helper=$PREFIX/bin/apt-helper" "$@"
 EOF
-cat > "$DEST/bin/dpkg" <<'EOF'
+cat > "$DEST/neutron-bin/dpkg" <<'EOF'
 #!/system/bin/sh
-exec "$PREFIX/bin/neutron-exec" dpkg --root="$PREFIX" \
+exec "$PREFIX/neutron-bin/neutron-exec" dpkg --root="$PREFIX" \
     --admindir="$PREFIX/var/lib/dpkg" "$@"
 EOF
-cat > "$DEST/bin/pkg" <<'EOF'
+cat > "$DEST/neutron-bin/pkg" <<'EOF'
 #!/system/bin/sh
 set -eu
 command="${1:-help}"
 [ "$#" -eq 0 ] || shift
 case "$command" in
-    update) exec "$PREFIX/bin/apt-get" update "$@" ;;
-    upgrade) exec "$PREFIX/bin/apt-get" upgrade "$@" ;;
-    install) exec "$PREFIX/bin/apt-get" install "$@" ;;
-    remove|uninstall) exec "$PREFIX/bin/apt-get" remove "$@" ;;
-    search) exec "$PREFIX/bin/apt-cache" search "$@" ;;
-    show) exec "$PREFIX/bin/apt-cache" show "$@" ;;
+    update) exec "$PREFIX/neutron-bin/apt-get" update "$@" ;;
+    upgrade) exec "$PREFIX/neutron-bin/apt-get" upgrade "$@" ;;
+    install) exec "$PREFIX/neutron-bin/apt-get" install "$@" ;;
+    remove|uninstall) exec "$PREFIX/neutron-bin/apt-get" remove "$@" ;;
+    search) exec "$PREFIX/neutron-bin/apt-cache" search "$@" ;;
+    show) exec "$PREFIX/neutron-bin/apt-cache" show "$@" ;;
     list) exec "$PREFIX/bin/apt" list "$@" ;;
     help|-h|--help)
         echo "Neutron pkg: update | upgrade | install PKG... | remove PKG... | search TERM | show PKG | list"
@@ -287,14 +297,14 @@ case "$command" in
     *) echo "pkg: unknown command: $command" >&2; exit 2 ;;
 esac
 EOF
-chmod 0755 "$DEST/bin/apt-get" "$DEST/bin/apt" "$DEST/bin/apt-cache" "$DEST/bin/dpkg" "$DEST/bin/pkg"
+chmod 0755 "$DEST/neutron-bin/apt-get" "$DEST/neutron-bin/apt" "$DEST/neutron-bin/apt-cache" "$DEST/neutron-bin/dpkg" "$DEST/neutron-bin/pkg"
 
 mkdir -p "$ASSET_DIR"
 tar --hard-dereference -czf "$ASSET_DIR/neutron-runtime-arm64.tar.gz" \
     -C "$DEST" glibc usr
 tar -tzf "$ASSET_DIR/neutron-runtime-arm64.tar.gz" >/dev/null
 tar --hard-dereference -czf "$ASSET_DIR/neutron-bootstrap-arm64.tar.gz" \
-    -C "$DEST" bin etc libexec usr var
+    -C "$DEST" neutron-bin bin etc libexec usr var
 tar -tzf "$ASSET_DIR/neutron-bootstrap-arm64.tar.gz" >/dev/null
 echo "Created Neutron ARM64 glibc + Wayland + X11 runtime bundle"
 echo "Created Neutron ARM64 bootstrap (bash, coreutils, apt, dpkg, pkg, tar, gzip)"
