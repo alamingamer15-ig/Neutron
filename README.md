@@ -4,14 +4,14 @@
 
 The project explores a Proton-inspired approach for Android: translate guest x86-64 code to native AArch64 code, provide a Linux userspace environment, and bridge guest application interfaces to Android's Linux kernel and graphics/audio/input systems.
 
-> **Status: early prototype.** The Android UI now has a persistent PTY-backed host shell and an offline installer for a pinned ARM64 glibc runtime plus Wayland/X11 runtime libraries. The x86-64 translator, Linux syscall compatibility layer, Android-backed desktop display server, and guest execution pipeline are not implemented yet.
+> **Status: early prototype.** The Android UI embeds Termux's reusable terminal-view and terminal-emulator libraries for a persistent PTY-backed host shell, and includes an offline installer for a pinned ARM64 glibc runtime plus Wayland/X11 runtime libraries. The x86-64 translator, Linux syscall compatibility layer, Android-backed desktop display server, and guest execution pipeline are not implemented yet.
 
 ## Project goals
 
 - Run selected x86-64 Linux ELF applications on ARM64 Android.
 - Work without root and keep Android SELinux enforcing.
 - Use dynamic binary translation (DBT) with an AArch64 code generator.
-- Provide a lightweight, app-managed Linux root filesystem.
+- Provide a lightweight, app-managed Linux prefix and package environment.
 - Integrate graphics, audio, input, filesystem, and networking with Android.
 - Make resource limits and performance/thermal behavior configurable.
 
@@ -21,7 +21,7 @@ The project explores a Proton-inspired approach for Android: translate guest x86
 - **Guest:** Linux x86-64 userspace and ELF applications.
 - **Execution:** One active guest application at a time; guest multithreading is intended.
 - **Runtime:** A shared Neutron runtime process with isolated guest execution state.
-- **Rootfs:** A Neutron-managed userspace with the `apk` package manager planned.
+- **Userspace:** A Neutron-managed prefix (`bin/`, `lib/`, `lib64/`, `home/`) with a Neutron-compatible package manager planned.
 - **Privileges:** No root requirement; no disabling SELinux.
 
 Neutron aims for progressive compatibility. It does not promise that every Linux application, syscall, graphics feature, or distribution will work.
@@ -35,7 +35,7 @@ The initial Android application uses Java, Android Views/XML, AndroidX AppCompat
 - Default appearance: dark
 - Main sections: Home, Applications, Terminal, and Settings
 - The Applications screen can record selected file names locally. It does not yet validate, copy, load, or execute ELF binaries.
-- The Terminal screen runs Android's `/system/bin/sh` in a persistent PTY. It is a host shell, not the guest Linux shell.
+- The Terminal screen embeds Termux's terminal UI and emulator libraries and starts Android's `/system/bin/sh` in a persistent PTY with Neutron's private prefix environment. It is currently a host shell, not the guest Linux shell.
 - Settings can install the pinned ARM64 glibc runtime and ARM64 Wayland/X11 libraries into Neutron's private prefix.
 - The current graphics bundle contains client/server libraries and tools, not a compositor or X server connected to Android. Graphical Linux applications cannot display windows yet.
 - Runtime status and resource information are not connected to a native guest execution engine.
