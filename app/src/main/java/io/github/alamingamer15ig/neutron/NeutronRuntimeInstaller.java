@@ -32,7 +32,7 @@ public final class NeutronRuntimeInstaller {
                 && new File(prefix, "glibc/lib/libc.so.6").isFile()
                 && new File(prefix, "usr/lib/aarch64-linux-gnu/libwayland-client.so.0").exists()
                 && new File(prefix, "usr/lib/aarch64-linux-gnu/libX11.so.6").exists()
-                && new File(prefix, "bin/grun").isFile();
+                && new File(prefix, "neutron-bin/grun").isFile();
     }
 
     public static synchronized void install(Context context) throws IOException {
@@ -61,8 +61,8 @@ public final class NeutronRuntimeInstaller {
 
             replaceDirectory(new File(staging, "glibc"), new File(prefix, "glibc"));
             replaceDirectory(new File(staging, "usr"), new File(prefix, "usr"));
-            writeExecutable(new File(prefix, "bin/grun"), grunScript());
-            writeExecutable(new File(prefix, "bin/glibc-check"), checkScript());
+            writeExecutable(new File(prefix, "neutron-bin/grun"), grunScript());
+            writeExecutable(new File(prefix, "neutron-bin/glibc-check"), checkScript());
 
             File marker = new File(prefix, RUNTIME_MARKER);
             try (FileOutputStream output = new FileOutputStream(marker, false)) {
@@ -227,7 +227,7 @@ public final class NeutronRuntimeInstaller {
     private static String checkScript() {
         return "#!/system/bin/sh\n"
                 + "set -eu\n"
-                + "exec \"$PREFIX/bin/grun\" --help\n";
+                + "exec \"$PREFIX/neutron-bin/grun\" --help\n";
     }
 
     private static void deleteRecursively(File file) throws IOException {
