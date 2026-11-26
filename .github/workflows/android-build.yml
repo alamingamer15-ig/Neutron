@@ -39,6 +39,9 @@ jobs:
       - name: Build offline ARM64 glibc, Wayland and X11 runtime bundle
         run: sh scripts/build-arm64-runtime-bundle.sh
 
+      - name: Build Neutron ARM64 bootstrap
+        run: sh scripts/build-arm64-runtime-bundle.sh
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -83,6 +86,23 @@ jobs:
           require_apk_entry "lib/arm64-v8a/libc++_shared.so"
           require_apk_entry "lib/arm64-v8a/libldcustom.so"
           require_apk_entry "assets/neutron-runtime-arm64.tar"
+          require_apk_entry "assets/neutron-bootstrap-arm64.tar"
+
+          unzip -p "$APK" assets/neutron-bootstrap-arm64.tar > "$RUNTIME_ARCHIVE"
+          test -s "$RUNTIME_ARCHIVE"
+          tar -tf "$RUNTIME_ARCHIVE" > "$RUNTIME_ENTRIES"
+          for entry in bin/pkg bin/bash bin/apt-get bin/dpkg usr/bin/bash usr/bin/apt-get usr/bin/dpkg usr/bin/ls usr/bin/tar etc/apt/sources.list var/lib/dpkg/status; do
+            if ! grep -Fxq -- "$entry" "$RUNTIME_ENTRIES"; then
+              echo "::error::Neutron bootstrap is missing required entry: $entry"
+              cat "$RUNTIME_ENTRIES"
+              exit 1
+            fi
+            echo "Verified bootstrap entry: $entry"
+          done
+
+          unzip -p "$APK" assets/neutron-runtime-arm64.tar > "$RUNTIME_ARCHIVE"
+          test -s "$RUNTIME_ARCHIVE"
+          tar -tf "$RUNTIME_ARCHIVE" > "$RUNTIME_ENTRIES"
 
           unzip -p "$APK" assets/neutron-runtime-arm64.tar > "$RUNTIME_ARCHIVE"
           test -s "$RUNTIME_ARCHIVE"
