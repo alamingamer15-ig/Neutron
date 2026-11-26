@@ -414,7 +414,7 @@ public class MainActivity extends AppCompatActivity {
                         showScreen(R.id.nav_terminal);
                     } else {
                         installStatus.setText("Environment installation failed: " + installError
-                                + "\nOpen Settings to retry the bootstrap installation.");
+                                + "\nOpen Settings to retry the environment installation.");
                     }
                 });
             }, "neutron-terminal-bootstrap").start();
@@ -434,7 +434,6 @@ public class MainActivity extends AppCompatActivity {
                     "HOME=" + home,
                     "PREFIX=" + prefix,
                     "PATH=" + prefix + "/bin:/system/bin:/system/xbin",
-                    "LD_LIBRARY_PATH=" + prefix + "/lib",
                     "TMPDIR=" + prefix + "/tmp",
                     "SHELL=" + shellPath,
                     "TERM=xterm-256color",
@@ -623,7 +622,7 @@ public class MainActivity extends AppCompatActivity {
             install.setOnClickListener(view -> {
                 install.setEnabled(false);
                 install.setText("Installing…");
-                status.setText("Installing the Neutron bootstrap and required runtime…");
+                status.setText("Installing Neutron's Termux bootstrap…");
                 Context appContext = getApplicationContext();
                 new Thread(() -> {
                     String failure = null;
