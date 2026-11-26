@@ -11,6 +11,17 @@ mkdir -p "$DEST/glibc/etc" "$DEST/usr/share/neutron"
 # Ubuntu 24.04 arm64 packages are used because they are glibc-linked and
 # compatible with Neutron's pinned patched glibc runtime.
 sudo dpkg --add-architecture arm64
+
+# The runner's default Ubuntu mirrors do not publish arm64 indexes. Keep those
+# sources amd64-only and use ports.ubuntu.com for the arm64 package set below.
+if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+    sudo sed -i '/^Architectures:/d; /^URIs:/a Architectures: amd64' \
+        /etc/apt/sources.list.d/ubuntu.sources
+fi
+if [ -f /etc/apt/sources.list ]; then
+    sudo sed -i 's/^deb /deb [arch=amd64] /' /etc/apt/sources.list
+fi
+
 sudo tee /etc/apt/sources.list.d/neutron-arm64.sources >/dev/null <<'EOF'
 Types: deb
 URIs: http://ports.ubuntu.com/ubuntu-ports
