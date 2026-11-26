@@ -66,7 +66,7 @@ public final class NeutronBootstrapInstaller {
             replaceDirectory(new File(staging, "usr"), new File(prefix, "usr"));
             replaceDirectory(new File(staging, "etc"), new File(prefix, "etc"));
             replaceDirectory(new File(staging, "var"), new File(prefix, "var"));
-            replaceDirectory(new File(staging, "bin"), new File(prefix, "bin"));
+            mergeDirectory(new File(staging, "bin"), new File(prefix, "bin"));
 
             File marker = new File(prefix, MARKER);
             try (FileOutputStream output = new FileOutputStream(marker, false)) {
@@ -177,6 +177,32 @@ public final class NeutronBootstrapInstaller {
         deleteRecursively(destination);
         if (!source.renameTo(destination)) {
             throw new IOException("Could not install bootstrap directory: " + destination.getName());
+        }
+    }
+
+    private static void mergeDirectory(File source, File destination) throws IOException {
+        if (!source.isDirectory()) throw new IOException("Bootstrap bin directory missing");
+        if (!destination.isDirectory() && !destination.mkdirs()) {
+            throw new IOException("Could not create Neutron bin directory");
+        }
+        File[] children = source.listFiles();
+        if (children == null) return;
+        for (File child : children) {
+            File target = new File(destination, child.getName());
+            if (child.isDirectory() && !isSymlink(child)) {
+                mergeDirectory(child, target);
+            } else {
+                if (target.exists() || isSymlink(target)) deleteRecursively(target);
+                if (isSymlink(child)) {
+                    try {
+                        Os.symlink(Os.readlink(child.getAbsolutePath()), target.getAbsolutePath());
+                    } catch (Exception error) {
+                        throw new IOException("Could not merge bootstrap symlink: " + child.getName(), error);
+                    }
+                } else if (!child.renameTo(target)) {
+                    throw new IOException("Could not install bootstrap command: " + child.getName());
+                }
+            }
         }
     }
 
