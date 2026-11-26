@@ -58,6 +58,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 \n\n## Apache Commons Compress\n\nNeutron uses Apache Commons Compress 1.27.1 (Apache License 2.0) to safely read the compressed Alpine minirootfs archive.\n
+## Ubuntu 24.04 ARM64 Wayland and X11 runtime packages
+
+The offline runtime bundle includes selected ARM64 binary packages from the official Ubuntu 24.04 repositories for Wayland and X11 runtime libraries. The exact package names, versions, and architectures are recorded in `usr/share/neutron/runtime-packages.txt` inside the installed prefix. Package copyright and license files shipped under `/usr/share/doc` are retained in the bundle under the Neutron prefix. Each package remains subject to its own upstream license.
+
 ## Android-compatible GNU C Library (glibc) 2.42.9
 
 Neutron packages the AArch64 dynamic loader and rootfs runtime libraries from
