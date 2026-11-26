@@ -62,10 +62,12 @@ public final class NeutronBootstrapInstaller {
             requireFile(staging, "etc/apt/sources.list");
             requireFile(staging, "bin/neutron-exec");
             requireFile(staging, "bin/pkg");
+            requireFile(staging, "libexec/apt-methods/http");
 
             replaceDirectory(new File(staging, "usr"), new File(prefix, "usr"));
             replaceDirectory(new File(staging, "etc"), new File(prefix, "etc"));
             replaceDirectory(new File(staging, "var"), new File(prefix, "var"));
+            replaceDirectory(new File(staging, "libexec"), new File(prefix, "libexec"));
             mergeDirectory(new File(staging, "bin"), new File(prefix, "bin"));
 
             File marker = new File(prefix, MARKER);
