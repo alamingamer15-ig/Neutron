@@ -578,6 +578,7 @@ public class MainActivity extends AppCompatActivity {
 
         addCoreLimiterCard(content);
         addMemoryLimiterCard(content);
+        addRuntimeInstallCard(content);
         addSettingsCard(content, "Graphics", "Vulkan and OpenGL", "Choose rendering mode, display resolution and frame-rate limits.");
         addSettingsCard(content, "Audio & input", "Devices and controls", "Configure audio output, touch controls, keyboard, mouse and gamepads.");
         addSettingsCard(content, "Storage", "Neutron userspace", "Manage the app-private bin/, lib/, lib64/ and home/ directories.");
@@ -592,6 +593,85 @@ public class MainActivity extends AppCompatActivity {
         // Tiny naming-origin Easter egg, intentionally implemented in Kotlin.
         SettingsEasterEgg.addTo(content, this, dp(28));
         return page;
+    }
+
+    private void addRuntimeInstallCard(LinearLayout parent) {
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(16), dp(15), dp(16), dp(15));
+        body.addView(text("LINUX RUNTIME", 10, R.color.neutron_primary, true));
+
+        TextView heading = text("ARM64 glibc + graphics libraries", 16,
+                R.color.neutron_text, true);
+        LinearLayout.LayoutParams headingParams = params(-1, -2);
+        headingParams.topMargin = dp(6);
+        body.addView(heading, headingParams);
+
+        TextView description = text(
+                "Install the patched glibc runtime, Wayland client/server libraries, X11 libraries and diagnostic tools. This is an offline install from the APK; it does not start a desktop display server.",
+                12, R.color.neutron_muted, false);
+        LinearLayout.LayoutParams descriptionParams = params(-1, -2);
+        descriptionParams.topMargin = dp(8);
+        body.addView(description, descriptionParams);
+
+        TextView status = text("", 12, R.color.neutron_muted, false);
+        LinearLayout.LayoutParams statusParams = params(-1, -2);
+        statusParams.topMargin = dp(12);
+        body.addView(status, statusParams);
+
+        MaterialButton install = button("Install ARM64 runtime");
+        LinearLayout.LayoutParams buttonParams = params(-1, -2);
+        buttonParams.topMargin = dp(10);
+        body.addView(install, buttonParams);
+
+        NeutronEnvironment environment = NeutronEnvironment.initialize(this);
+        boolean installed = NeutronRuntimeInstaller.isInstalled(environment);
+        status.setText(installed
+                ? "Installed · glibc, Wayland and X11 runtime files are ready."
+                : "Not installed · runtime files will be extracted into Neutron's private prefix.");
+        if (installed) {
+            install.setText("Installed");
+            install.setEnabled(false);
+        } else {
+            install.setOnClickListener(view -> {
+                install.setEnabled(false);
+                install.setText("Installing…");
+                status.setText("Extracting the ARM64 runtime. Keep Neutron open…");
+                Context appContext = getApplicationContext();
+                new Thread(() -> {
+                    String failure = null;
+                    try {
+                        NeutronRuntimeInstaller.install(appContext);
+                    } catch (Exception error) {
+                        failure = error.getClass().getSimpleName() + ": "
+                                + String.valueOf(error.getMessage());
+                    }
+                    final String installError = failure;
+                    runOnUiThread(() -> {
+                        boolean ready = NeutronRuntimeInstaller.isInstalled(
+                                NeutronEnvironment.initialize(MainActivity.this));
+                        if (ready) {
+                            status.setText("Installed · glibc, Wayland and X11 runtime files are ready.");
+                            install.setText("Installed");
+                            install.setEnabled(false);
+                            Toast.makeText(MainActivity.this,
+                                    "Neutron ARM64 runtime installed", Toast.LENGTH_LONG).show();
+                        } else {
+                            status.setText("Installation failed: "
+                                    + (installError == null ? "runtime verification failed" : installError));
+                            install.setText("Retry installation");
+                            install.setEnabled(true);
+                        }
+                    });
+                }, "neutron-runtime-installer").start();
+            });
+        }
+
+        MaterialCardView runtimeCard = card();
+        runtimeCard.addView(body);
+        LinearLayout.LayoutParams cardParams = params(-1, -2);
+        cardParams.topMargin = dp(16);
+        parent.addView(runtimeCard, cardParams);
     }
 
     private void addCoreLimiterCard(LinearLayout parent) {
