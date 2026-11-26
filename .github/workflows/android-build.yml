@@ -57,13 +57,50 @@ jobs:
         run: gradle assembleDebug
 
       - name: Verify ARM64 runtime bundle and native libraries are packaged
+        shell: bash
         run: |
-          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/arm64-v8a/libc\+\+_shared\.so$'
-          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/arm64-v8a/libldcustom\.so$'
-          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'assets/neutron-runtime-arm64\.tar\.gz$'
-          unzip -p app/build/outputs/apk/debug/app-debug.apk assets/neutron-runtime-arm64.tar.gz > /tmp/neutron-runtime-arm64.tar.gz
-          tar -tzf /tmp/neutron-runtime-arm64.tar.gz | grep -F 'libwayland-client.so.0'
-          tar -tzf /tmp/neutron-runtime-arm64.tar.gz | grep -F 'libX11.so.6'
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          APK_ENTRIES="$(mktemp)"
+          RUNTIME_ARCHIVE="$(mktemp)"
+          RUNTIME_ENTRIES="$(mktemp)"
+          trap 'rm -f "$APK_ENTRIES" "$RUNTIME_ARCHIVE" "$RUNTIME_ENTRIES"' EXIT
+
+          # Use unzip's name-only listing instead of parsing the formatted
+          # columns from "unzip -l".
+          unzip -Z1 "$APK" > "$APK_ENTRIES"
+          require_apk_entry() {
+            local entry="$1"
+            if ! grep -Fxq -- "$entry" "$APK_ENTRIES"; then
+              echo "::error::APK is missing required entry: $entry"
+              echo "APK entries:"
+              cat "$APK_ENTRIES"
+              exit 1
+            fi
+            echo "Verified APK entry: $entry"
+          }
+
+          require_apk_entry "lib/arm64-v8a/libc++_shared.so"
+          require_apk_entry "lib/arm64-v8a/libldcustom.so"
+          require_apk_entry "assets/neutron-runtime-arm64.tar.gz"
+
+          unzip -p "$APK" assets/neutron-runtime-arm64.tar.gz > "$RUNTIME_ARCHIVE"
+          test -s "$RUNTIME_ARCHIVE"
+          tar -tzf "$RUNTIME_ARCHIVE" > "$RUNTIME_ENTRIES"
+
+          require_runtime_entry() {
+            local entry="$1"
+            if ! grep -Fxq -- "$entry" "$RUNTIME_ENTRIES"; then
+              echo "::error::ARM64 runtime archive is missing required entry: $entry"
+              echo "Runtime archive entries:"
+              cat "$RUNTIME_ENTRIES"
+              exit 1
+            fi
+            echo "Verified runtime entry: $entry"
+          }
+
+          require_runtime_entry "usr/lib/aarch64-linux-gnu/libwayland-client.so.0"
+          require_runtime_entry "usr/lib/aarch64-linux-gnu/libX11.so.6"
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
