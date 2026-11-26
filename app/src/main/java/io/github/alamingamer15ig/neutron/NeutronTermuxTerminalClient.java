@@ -119,6 +119,5 @@ final class NeutronTermuxTerminalClient implements TerminalSessionClient, Termin
         terminalView.setTerminalCursorBlinkerState(enabled, false);
     }
 
-    @Override public void setTerminalShellPid(TerminalSession session, int pid) { }
     @Override public Integer getTerminalCursorStyle() { return null; }
 }
