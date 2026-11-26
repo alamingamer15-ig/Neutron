@@ -340,6 +340,8 @@ public class MainActivity extends AppCompatActivity {
 
     private NeutronPty terminalPty;
     private Thread terminalReaderThread;
+    private final ArrayList<String> terminalHistory = new ArrayList<>();
+    private int terminalHistoryIndex = 0;
 
     private ScrollView buildTerminalScreen() {
         closeTerminalSession();
@@ -405,6 +407,30 @@ public class MainActivity extends AppCompatActivity {
         command.setOnClickListener(v -> showTerminalKeyboard(command));
         command.setOnFocusChangeListener((v, hasFocus) -> {
             if (hasFocus) command.post(() -> showTerminalKeyboard(command));
+        });
+
+        command.setOnKeyListener((view, keyCode, event) -> {
+            if (event.getAction() != android.view.KeyEvent.ACTION_DOWN) return false;
+            if (keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP) {
+                if (!terminalHistory.isEmpty()) {
+                    terminalHistoryIndex = Math.max(0, terminalHistoryIndex - 1);
+                    command.setText(terminalHistory.get(terminalHistoryIndex));
+                    command.setSelection(command.length());
+                }
+                return true;
+            }
+            if (keyCode == android.view.KeyEvent.KEYCODE_DPAD_DOWN) {
+                if (terminalHistoryIndex < terminalHistory.size() - 1) {
+                    terminalHistoryIndex++;
+                    command.setText(terminalHistory.get(terminalHistoryIndex));
+                } else {
+                    terminalHistoryIndex = terminalHistory.size();
+                    command.setText("");
+                }
+                command.setSelection(command.length());
+                return true;
+            }
+            return false;
         });
         LinearLayout.LayoutParams commandParams = params(-1, -2);
         commandParams.topMargin = dp(10);
@@ -512,6 +538,12 @@ public class MainActivity extends AppCompatActivity {
         String entered = command.getText().toString();
         if (entered.isEmpty() || session == null || session.isClosed()) return;
         command.setText("");
+        if (terminalHistory.isEmpty()
+                || !terminalHistory.get(terminalHistory.size() - 1).equals(entered)) {
+            terminalHistory.add(entered);
+            if (terminalHistory.size() > 200) terminalHistory.remove(0);
+        }
+        terminalHistoryIndex = terminalHistory.size();
         InputMethodManager imm = (InputMethodManager) getSystemService(
                 Context.INPUT_METHOD_SERVICE);
         if (imm != null) imm.hideSoftInputFromWindow(command.getWindowToken(), 0);
