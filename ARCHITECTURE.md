@@ -123,7 +123,7 @@ Compatibility is progressive. Unsupported or unsafe operations must fail clearly
 - `apk` is the planned package manager; external repositories are intended.
 - The default rootfs contains ARM64 glibc and native ARM64 utilities; its shell runs natively on the host.
 - The current bootstrap is a prefix-based runtime bundle rather than a full distro rootfs. It installs the pinned Android-compatible ARM64 glibc loader/libraries and a pre-resolved set of Ubuntu 24.04 ARM64 Wayland/X11 runtime packages under the Neutron prefix. The package list records exact package versions; the package manager is still a separate planned stage.
-- The initial graphics bundle includes Wayland client/server libraries, X11 client libraries, and diagnostic tools. It does not include an Android-connected Wayland compositor or X server, so installing these libraries alone does not make desktop windows appear.
+- The initial graphics bundle includes Wayland client/server libraries and X11 client libraries. It does not include an Android-connected Wayland compositor or X server, so installing these libraries alone does not make desktop windows appear.
 - Selected x86-64 application ELFs and their x86-64 libraries use the x86-64 guest ABI and DBT. Do not mix x86-64 guest libraries into the ARM64 base rootfs.
 - Guest libc and dynamic-linker strategy remains an explicit design decision. Generic Linux ELF compatibility must not be confused with universal compatibility across glibc- and musl-based environments.
 - Writable rootfs with protected system directories.
