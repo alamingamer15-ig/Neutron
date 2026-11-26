@@ -30,8 +30,9 @@ EOF
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends dpkg-dev binutils
 sudo apt-get install -y --download-only --no-install-recommends \
-    bash dash coreutils tar gzip xz-utils findutils grep sed gawk \
-    dpkg apt ca-certificates curl wget \
+    bash:arm64 dash:arm64 coreutils:arm64 tar:arm64 gzip:arm64 xz-utils:arm64 \
+    findutils:arm64 grep:arm64 sed:arm64 gawk:arm64 \
+    dpkg:arm64 apt:arm64 ca-certificates:arm64 curl:arm64 wget:arm64 \
     libwayland-client0:arm64 \
     libwayland-server0:arm64 \
     libwayland-cursor0:arm64 \
