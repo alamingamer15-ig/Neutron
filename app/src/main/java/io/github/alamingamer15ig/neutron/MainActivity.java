@@ -379,9 +379,10 @@ public class MainActivity extends AppCompatActivity {
             return page;
         }
 
-        if (!NeutronBootstrapInstaller.isInstalled(environment)) {
+        if (!NeutronBootstrapInstaller.isInstalled(environment)
+                || !NeutronRuntimeInstaller.isInstalled(environment)) {
             TextView installStatus = text(
-                    "Preparing Neutron's Linux environment… This is a one-time offline installation.",
+                    "Preparing Neutron's Termux environment and glibc toolchain…",
                     13, R.color.neutron_muted, false);
             LinearLayout.LayoutParams installStatusParams = params(-1, -2);
             installStatusParams.topMargin = dp(12);
@@ -392,9 +393,13 @@ public class MainActivity extends AppCompatActivity {
                 String failure = null;
                 try {
                     NeutronBootstrapInstaller.install(appContext);
-                    if (!NeutronBootstrapInstaller.isInstalled(
-                            NeutronEnvironment.initialize(appContext))) {
-                        throw new IOException("Bootstrap verification failed after installation");
+                    NeutronRuntimeInstaller.install(appContext);
+                    NeutronEnvironment installedEnvironment = NeutronEnvironment.initialize(appContext);
+                    if (!NeutronBootstrapInstaller.isInstalled(installedEnvironment)) {
+                        throw new IOException("Termux bootstrap verification failed after installation");
+                    }
+                    if (!NeutronRuntimeInstaller.isInstalled(installedEnvironment)) {
+                        throw new IOException("Termux glibc package verification failed after installation");
                     }
                 } catch (Exception error) {
                     failure = error.getClass().getSimpleName() + ": "
@@ -423,12 +428,14 @@ public class MainActivity extends AppCompatActivity {
 
             String prefix = environment.getRootDirectory().getAbsolutePath();
             String home = environment.getHomeDirectory().getAbsolutePath();
-            String shellPath = prefix + "/neutron-bin/bash";
+            String shellPath = prefix + "/bin/bash";
             String[] shellArgs = new String[]{"-l", "-i"};
             String[] shellEnvironment = {
                     "HOME=" + home,
                     "PREFIX=" + prefix,
-                    "PATH=" + prefix + "/neutron-bin:" + prefix + "/bin:/system/bin:/system/xbin",
+                    "PATH=" + prefix + "/bin:/system/bin:/system/xbin",
+                    "LD_LIBRARY_PATH=" + prefix + "/lib",
+                    "TMPDIR=" + prefix + "/tmp",
                     "SHELL=" + shellPath,
                     "TERM=xterm-256color",
                     "LANG=C.UTF-8",
@@ -500,16 +507,16 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout body = new LinearLayout(this);
         body.setOrientation(LinearLayout.VERTICAL);
         body.setPadding(dp(16), dp(15), dp(16), dp(15));
-        body.addView(text("LINUX RUNTIME", 10, R.color.neutron_primary, true));
+        body.addView(text("GLIBC TOOLCHAIN", 10, R.color.neutron_primary, true));
 
-        TextView heading = text("ARM64 glibc + graphics libraries", 16,
+        TextView heading = text("Install glibc through Termux pkg", 16,
                 R.color.neutron_text, true);
         LinearLayout.LayoutParams headingParams = params(-1, -2);
         headingParams.topMargin = dp(6);
         body.addView(heading, headingParams);
 
         TextView description = text(
-                "Install the patched glibc runtime, Wayland client/server libraries and X11 runtime libraries. This is an offline install from the APK; it does not start a desktop display server.",
+                "Neutron runs Termux's own package manager to install glibc-repo, glibc-runner, gcc-glibc and gcc-libs-glibc. These packages are installed inside Neutron's private prefix; Android's system libraries are untouched.",
                 12, R.color.neutron_muted, false);
         LinearLayout.LayoutParams descriptionParams = params(-1, -2);
         descriptionParams.topMargin = dp(8);
@@ -520,7 +527,7 @@ public class MainActivity extends AppCompatActivity {
         statusParams.topMargin = dp(12);
         body.addView(status, statusParams);
 
-        MaterialButton install = button("Install ARM64 runtime");
+        MaterialButton install = button("Install glibc packages");
         LinearLayout.LayoutParams buttonParams = params(-1, -2);
         buttonParams.topMargin = dp(10);
         body.addView(install, buttonParams);
@@ -528,8 +535,8 @@ public class MainActivity extends AppCompatActivity {
         NeutronEnvironment environment = NeutronEnvironment.initialize(this);
         boolean installed = NeutronRuntimeInstaller.isInstalled(environment);
         status.setText(installed
-                ? "Installed · glibc, Wayland and X11 runtime files are ready."
-                : "Not installed · runtime files will be extracted into Neutron's private prefix.");
+                ? "Installed · Termux glibc packages are ready."
+                : "Not installed · Neutron will run pkg to install the glibc toolchain.");
         if (installed) {
             install.setText("Installed");
             install.setEnabled(false);
@@ -537,7 +544,7 @@ public class MainActivity extends AppCompatActivity {
             install.setOnClickListener(view -> {
                 install.setEnabled(false);
                 install.setText("Installing…");
-                status.setText("Extracting the ARM64 runtime. Keep Neutron open…");
+                status.setText("Running pkg update and installing the glibc packages. Keep Neutron open…");
                 Context appContext = getApplicationContext();
                 new Thread(() -> {
                     String failure = null;
@@ -552,11 +559,11 @@ public class MainActivity extends AppCompatActivity {
                         boolean ready = NeutronRuntimeInstaller.isInstalled(
                                 NeutronEnvironment.initialize(MainActivity.this));
                         if (ready) {
-                            status.setText("Installed · glibc, Wayland and X11 runtime files are ready.");
+                            status.setText("Installed · Termux glibc packages are ready.");
                             install.setText("Installed");
                             install.setEnabled(false);
                             Toast.makeText(MainActivity.this,
-                                    "Neutron ARM64 runtime installed", Toast.LENGTH_LONG).show();
+                                    "Termux glibc packages installed", Toast.LENGTH_LONG).show();
                         } else {
                             status.setText("Installation failed: "
                                     + (installError == null ? "runtime verification failed" : installError));
@@ -588,7 +595,7 @@ public class MainActivity extends AppCompatActivity {
         body.addView(heading, headingParams);
 
         TextView description = text(
-                "Install Neutron's own glibc-based userspace: Bash, coreutils, tar, gzip, apt, dpkg and the pkg command. Packages are extracted into Neutron's private prefix; no separate Termux installation is required.",
+                "Install Termux's Bionic-based Bash, coreutils, apt, dpkg and pkg bootstrap, rebuilt for Neutron's own Android package id and private files/neutron prefix. No separate Termux app is required.",
                 12, R.color.neutron_muted, false);
         LinearLayout.LayoutParams descriptionParams = params(-1, -2);
         descriptionParams.topMargin = dp(8);
@@ -607,8 +614,8 @@ public class MainActivity extends AppCompatActivity {
         NeutronEnvironment environment = NeutronEnvironment.initialize(this);
         boolean installed = NeutronBootstrapInstaller.isInstalled(environment);
         status.setText(installed
-                ? "Installed · Bash, coreutils, apt, dpkg and pkg are available."
-                : "Not installed · the bootstrap will be extracted offline from the APK.");
+                ? "Installed · Termux's Bash, coreutils, apt, dpkg and pkg are available."
+                : "Not installed · Neutron's fork-specific Termux bootstrap will be installed.");
         if (installed) {
             install.setText("Installed");
             install.setEnabled(false);
@@ -631,7 +638,7 @@ public class MainActivity extends AppCompatActivity {
                         boolean ready = NeutronBootstrapInstaller.isInstalled(
                                 NeutronEnvironment.initialize(MainActivity.this));
                         if (ready) {
-                            status.setText("Installed · open Terminal to use Bash, pkg, apt and dpkg.");
+                            status.setText("Installed · open Terminal to use Termux's Bash, pkg, apt and dpkg.");
                             install.setText("Installed");
                             install.setEnabled(false);
                             Toast.makeText(MainActivity.this,
