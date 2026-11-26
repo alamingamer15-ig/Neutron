@@ -30,6 +30,10 @@ grep -Fq 'TERMUX__PREFIX_SUBDIR="neutron"' "$PROPERTIES"
 grep -Fq '__TERMUX_BUILD_PROPS__VALIDATE_TERMUX_PREFIX_USR_MERGE_FORMAT="false"' "$PROPERTIES"
 
 cd "$TERMUX_REPO"
+# This pinned Termux revision removed the standalone bzip2 package, but its
+# upstream bootstrap list still names it. Omit that obsolete entry; the other
+# bootstrap packages and their dependencies provide the required runtime.
+sed -i '/^\s*PACKAGES+=("bzip2")$/d' scripts/build-bootstraps.sh
 # Termux's own build container compiles the bootstrap packages against Neutron's
 # Android application id and private PREFIX, so no com.termux paths are baked in.
 ./scripts/run-docker.sh ./scripts/build-bootstraps.sh --architectures aarch64 --add curl,wget,ca-certificates,unzip
