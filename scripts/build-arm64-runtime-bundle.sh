@@ -73,7 +73,8 @@ sudo env APT_CONFIG="$STAGE/apt-arm64.conf" apt-get install -y --download-only -
 
 sh "$ROOT/scripts/install-android-glibc.sh" runtime "$DEST/glibc"
 
-mkdir -p "$STAGE/debs" "$DEST/var/lib/dpkg" "$DEST/var/cache/apt/archives" \
+mkdir -p "$STAGE/debs" "$DEST/var/lib/dpkg/updates" "$DEST/var/lib/dpkg/info" \
+    "$DEST/var/lib/apt/lists/partial" "$DEST/var/cache/apt/archives/partial" \
     "$DEST/var/log/apt" "$DEST/etc/apt" "$DEST/bin"
 find /var/cache/apt/archives -maxdepth 1 -type f -name '*.deb' -exec cp {} "$STAGE/debs/" \;
 PACKAGE_LIST="$DEST/usr/share/neutron/runtime-packages.txt"
@@ -150,6 +151,14 @@ esac
 exec "$LOADER" --library-path "$LIBPATH" "$PROGRAM" "$@"
 EOF
 chmod 0755 "$DEST/bin/neutron-exec"
+
+# Neutron uses an explicit loader library path, so Android's restricted
+# environment does not need a system-wide ldconfig cache.
+cat > "$DEST/bin/ldconfig" <<'EOF'
+#!/system/bin/sh
+exit 0
+EOF
+chmod 0755 "$DEST/bin/ldconfig"
 
 for command in bash apt apt-get dpkg ls cat cp mv rm mkdir rmdir chmod chown ln readlink \
     pwd env printenv uname id whoami date sleep touch mkdir find xargs grep sed awk \
