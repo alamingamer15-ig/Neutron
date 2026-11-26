@@ -88,7 +88,7 @@ jobs:
           unzip -p "$APK" assets/neutron-bootstrap-arm64.tar > "$RUNTIME_ARCHIVE"
           test -s "$RUNTIME_ARCHIVE"
           tar -tf "$RUNTIME_ARCHIVE" > "$RUNTIME_ENTRIES"
-          for entry in bin/pkg bin/bash bin/apt-get bin/apt-cache bin/apt-helper bin/dpkg libexec/apt-methods/http usr/bin/bash usr/bin/apt-get usr/bin/dpkg usr/bin/ls usr/bin/tar etc/apt/sources.list var/lib/dpkg/status; do
+          for entry in bin neutron-bin/pkg neutron-bin/bash neutron-bin/apt-get neutron-bin/apt-cache neutron-bin/apt-helper neutron-bin/dpkg neutron-bin/neutron-exec libexec/apt-methods/http usr/bin/bash usr/bin/apt-get usr/bin/dpkg usr/bin/ls usr/bin/tar etc/apt/sources.list var/lib/dpkg/status; do
             if ! grep -Fxq -- "$entry" "$RUNTIME_ENTRIES"; then
               echo "::error::Neutron bootstrap is missing required entry: $entry"
               cat "$RUNTIME_ENTRIES"
