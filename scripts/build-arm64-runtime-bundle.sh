@@ -77,6 +77,10 @@ for package in "$STAGE"/debs/*.deb; do
     name="$(dpkg-deb -f "$package" Package)"
     version="$(dpkg-deb -f "$package" Version)"
     if [ "$name" = libc6 ] || [ "$name" = libc-bin ]; then
+        # Record the host-provided patched glibc as installed without unpacking
+        # Ubuntu's libc over Neutron's Android-compatible runtime.
+        dpkg-deb -f "$package" >> "$DEST/var/lib/dpkg/status"
+        printf 'Status: install ok installed\n\n' >> "$DEST/var/lib/dpkg/status"
         continue
     fi
     printf '%s %s %s\n' "$name" "$version" "$architecture" >> "$PACKAGE_LIST"
@@ -160,7 +164,25 @@ exec "$PREFIX/bin/neutron-exec" apt-get -o "Dir::Root=$PREFIX" \
 EOF
 cat > "$DEST/bin/apt" <<'EOF'
 #!/system/bin/sh
-exec "$PREFIX/bin/apt-get" "$@"
+: "${PREFIX:?}"
+export APT_CONFIG="$PREFIX/etc/apt/apt.conf"
+exec "$PREFIX/bin/neutron-exec" apt -o "Dir::Root=$PREFIX" \
+    -o "Dir::State::status=$PREFIX/var/lib/dpkg/status" \
+    -o "Dir::State::lists=$PREFIX/var/lib/apt/lists" \
+    -o "Dir::Cache=$PREFIX/var/cache/apt" \
+    -o "Dir::Etc::sourcelist=$PREFIX/etc/apt/sources.list" \
+    -o "Dir::Etc::sourceparts=-" "$@"
+EOF
+cat > "$DEST/bin/apt-cache" <<'EOF'
+#!/system/bin/sh
+: "${PREFIX:?}"
+export APT_CONFIG="$PREFIX/etc/apt/apt.conf"
+exec "$PREFIX/bin/neutron-exec" apt-cache -o "Dir::Root=$PREFIX" \
+    -o "Dir::State::status=$PREFIX/var/lib/dpkg/status" \
+    -o "Dir::State::lists=$PREFIX/var/lib/apt/lists" \
+    -o "Dir::Cache=$PREFIX/var/cache/apt" \
+    -o "Dir::Etc::sourcelist=$PREFIX/etc/apt/sources.list" \
+    -o "Dir::Etc::sourceparts=-" "$@"
 EOF
 cat > "$DEST/bin/dpkg" <<'EOF'
 #!/system/bin/sh
@@ -177,16 +199,16 @@ case "$command" in
     upgrade) exec "$PREFIX/bin/apt-get" upgrade "$@" ;;
     install) exec "$PREFIX/bin/apt-get" install "$@" ;;
     remove|uninstall) exec "$PREFIX/bin/apt-get" remove "$@" ;;
-    search) exec "$PREFIX/bin/apt-get" search "$@" ;;
-    show) exec "$PREFIX/bin/apt-get" show "$@" ;;
-    list) exec "$PREFIX/bin/apt-get" list "$@" ;;
+    search) exec "$PREFIX/bin/apt-cache" search "$@" ;;
+    show) exec "$PREFIX/bin/apt-cache" show "$@" ;;
+    list) exec "$PREFIX/bin/apt" list "$@" ;;
     help|-h|--help)
         echo "Neutron pkg: update | upgrade | install PKG... | remove PKG... | search TERM | show PKG | list"
         ;;
     *) echo "pkg: unknown command: $command" >&2; exit 2 ;;
 esac
 EOF
-chmod 0755 "$DEST/bin/apt-get" "$DEST/bin/apt" "$DEST/bin/dpkg" "$DEST/bin/pkg"
+chmod 0755 "$DEST/bin/apt-get" "$DEST/bin/apt" "$DEST/bin/apt-cache" "$DEST/bin/dpkg" "$DEST/bin/pkg"
 
 mkdir -p "$ASSET_DIR"
 tar --hard-dereference -czf "$ASSET_DIR/neutron-runtime-arm64.tar.gz" \
