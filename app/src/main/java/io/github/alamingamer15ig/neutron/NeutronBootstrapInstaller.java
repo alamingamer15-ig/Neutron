@@ -174,6 +174,7 @@ public final class NeutronBootstrapInstaller {
                 }
             }
 
+            if (output.exists() || isSymlink(output)) deleteRecursively(output);
             try {
                 Os.symlink(linkTarget, output.getAbsolutePath());
             } catch (Exception error) {
