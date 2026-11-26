@@ -2,7 +2,7 @@
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-ASSET_DIR="$ROOT/app/src/main/assets"
+ASSET_DIR="$ROOT/app/build/generated/neutronAssets"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT HUP INT TERM
 DEST="$STAGE/runtime"
