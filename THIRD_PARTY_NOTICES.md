@@ -80,3 +80,7 @@ IDs before packaging. The loader and libraries remain under the GNU LGPL terms.
 ## Termux terminal libraries 0.118.0
 
 Neutron uses the upstream `terminal-view` and `terminal-emulator` Android library modules from [termux/termux-app](https://github.com/termux/termux-app), pinned to version `0.118.0`. These reusable library modules are licensed under Apache License 2.0; this does not relicense or include the full Termux application, which is GPL-3.0-only. See [Termux's license information](https://github.com/termux/termux-app/blob/master/LICENSE.md) and the included Apache-2.0 license text at `licenses/Apache-2.0-Termux-terminal-libraries.txt`.
+
+## Neutron ARM64 bootstrap packages
+
+The Neutron bootstrap bundles selected ARM64 and architecture-independent binary packages from the official Ubuntu 24.04 repositories, including Bash, coreutils, tar, gzip, apt and dpkg, together with their resolved dependencies. Package names, versions and architectures are recorded in `usr/share/neutron/runtime-packages.txt` inside the installed prefix. Package copyright and license metadata is retained under `usr/share/doc`; each package remains subject to its own upstream license. The bootstrap is built for Neutron's glibc userspace and is not a Termux/Bionic package repository.
