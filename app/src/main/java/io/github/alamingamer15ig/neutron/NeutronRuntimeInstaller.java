@@ -36,7 +36,7 @@ public final class NeutronRuntimeInstaller {
                 + "dpkg-query -W glibc-runner gcc-glibc gcc-libs-glibc >/dev/null; "
                 + "touch \"$PREFIX/" + MARKER + "\"";
 
-        ProcessBuilder builder = new ProcessBuilder(bash, "-c", script);
+        ProcessBuilder builder = new ProcessBuilder(bash, "-lc", script);
         builder.directory(home);
         builder.redirectErrorStream(true);
         builder.environment().put("PREFIX", prefix.getAbsolutePath());
