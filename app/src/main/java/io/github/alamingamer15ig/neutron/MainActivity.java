@@ -385,12 +385,16 @@ public class MainActivity extends AppCompatActivity {
 
             String prefix = environment.getRootDirectory().getAbsolutePath();
             String home = environment.getHomeDirectory().getAbsolutePath();
-            String[] shellArgs = {"/system/bin/sh", "-i"};
+            boolean bootstrapInstalled = NeutronBootstrapInstaller.isInstalled(environment);
+            String shellPath = bootstrapInstalled
+                    ? prefix + "/bin/bash" : "/system/bin/sh";
+            String[] shellArgs = bootstrapInstalled
+                    ? new String[]{"-l", "-i"} : new String[]{"/system/bin/sh", "-i"};
             String[] shellEnvironment = {
                     "HOME=" + home,
                     "PREFIX=" + prefix,
                     "PATH=" + prefix + "/bin:/system/bin:/system/xbin",
-                    "SHELL=/system/bin/sh",
+                    "SHELL=" + shellPath,
                     "TERM=xterm-256color",
                     "LANG=C.UTF-8",
                     "USER=neutron",
@@ -398,7 +402,7 @@ public class MainActivity extends AppCompatActivity {
             };
 
             terminalSession = new TerminalSession(
-                    "/system/bin/sh",
+                    shellPath,
                     home,
                     shellArgs,
                     shellEnvironment,
@@ -440,6 +444,7 @@ public class MainActivity extends AppCompatActivity {
         addCoreLimiterCard(content);
         addMemoryLimiterCard(content);
         addRuntimeInstallCard(content);
+        addBootstrapInstallCard(content);
         addSettingsCard(content, "Graphics", "Vulkan and OpenGL", "Choose rendering mode, display resolution and frame-rate limits.");
         addSettingsCard(content, "Audio & input", "Devices and controls", "Configure audio output, touch controls, keyboard, mouse and gamepads.");
         addSettingsCard(content, "Storage", "Neutron userspace", "Manage the app-private bin/, lib/, lib64/ and home/ directories.");
@@ -533,6 +538,85 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout.LayoutParams cardParams = params(-1, -2);
         cardParams.topMargin = dp(16);
         parent.addView(runtimeCard, cardParams);
+    }
+
+    private void addBootstrapInstallCard(LinearLayout parent) {
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(16), dp(15), dp(16), dp(15));
+        body.addView(text("NEUTRON BOOTSTRAP", 10, R.color.neutron_primary, true));
+
+        TextView heading = text("ARM64 Linux command-line environment", 16,
+                R.color.neutron_text, true);
+        LinearLayout.LayoutParams headingParams = params(-1, -2);
+        headingParams.topMargin = dp(6);
+        body.addView(heading, headingParams);
+
+        TextView description = text(
+                "Install Neutron's own glibc-based userspace: Bash, coreutils, tar, gzip, apt, dpkg and the pkg command. Packages are extracted into Neutron's private prefix; no separate Termux installation is required.",
+                12, R.color.neutron_muted, false);
+        LinearLayout.LayoutParams descriptionParams = params(-1, -2);
+        descriptionParams.topMargin = dp(8);
+        body.addView(description, descriptionParams);
+
+        TextView status = text("", 12, R.color.neutron_muted, false);
+        LinearLayout.LayoutParams statusParams = params(-1, -2);
+        statusParams.topMargin = dp(12);
+        body.addView(status, statusParams);
+
+        MaterialButton install = button("Install Neutron bootstrap");
+        LinearLayout.LayoutParams buttonParams = params(-1, -2);
+        buttonParams.topMargin = dp(10);
+        body.addView(install, buttonParams);
+
+        NeutronEnvironment environment = NeutronEnvironment.initialize(this);
+        boolean installed = NeutronBootstrapInstaller.isInstalled(environment);
+        status.setText(installed
+                ? "Installed · Bash, coreutils, apt, dpkg and pkg are available."
+                : "Not installed · the bootstrap will be extracted offline from the APK.");
+        if (installed) {
+            install.setText("Installed");
+            install.setEnabled(false);
+        } else {
+            install.setOnClickListener(view -> {
+                install.setEnabled(false);
+                install.setText("Installing…");
+                status.setText("Installing the Neutron bootstrap and required runtime…");
+                Context appContext = getApplicationContext();
+                new Thread(() -> {
+                    String failure = null;
+                    try {
+                        NeutronBootstrapInstaller.install(appContext);
+                    } catch (Exception error) {
+                        failure = error.getClass().getSimpleName() + ": "
+                                + String.valueOf(error.getMessage());
+                    }
+                    final String installError = failure;
+                    runOnUiThread(() -> {
+                        boolean ready = NeutronBootstrapInstaller.isInstalled(
+                                NeutronEnvironment.initialize(MainActivity.this));
+                        if (ready) {
+                            status.setText("Installed · open Terminal to use Bash, pkg, apt and dpkg.");
+                            install.setText("Installed");
+                            install.setEnabled(false);
+                            Toast.makeText(MainActivity.this,
+                                    "Neutron bootstrap installed", Toast.LENGTH_LONG).show();
+                        } else {
+                            status.setText("Installation failed: "
+                                    + (installError == null ? "bootstrap verification failed" : installError));
+                            install.setText("Retry installation");
+                            install.setEnabled(true);
+                        }
+                    });
+                }, "neutron-bootstrap-installer").start();
+            });
+        }
+
+        MaterialCardView bootstrapCard = card();
+        bootstrapCard.addView(body);
+        LinearLayout.LayoutParams cardParams = params(-1, -2);
+        cardParams.topMargin = dp(16);
+        parent.addView(bootstrapCard, cardParams);
     }
 
     private void addCoreLimiterCard(LinearLayout parent) {
