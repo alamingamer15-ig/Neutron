@@ -211,7 +211,7 @@ public class MainActivity extends AppCompatActivity {
         titleParams.topMargin = dp(15);
         body.addView(title, titleParams);
 
-        TextView description = text("The Android interface is running. The native translator and Linux root filesystem will connect in a later milestone.",
+        TextView description = text("The Neutron userspace directories are initialized. Native Linux execution and x86-64 translation are still under development.",
                 13, R.color.neutron_muted, false);
         LinearLayout.LayoutParams descriptionParams = params(-1, -2);
         descriptionParams.topMargin = dp(6);
@@ -308,16 +308,11 @@ public class MainActivity extends AppCompatActivity {
 
                 MaterialButton launchButton = button("Launch");
                 launchButton.setMinWidth(dp(76));
-                launchButton.setEnabled(isRootfsValid());
-                launchButton.setAlpha(launchButton.isEnabled() ? 1.0f : 0.45f);
+                launchButton.setEnabled(false);
+                launchButton.setAlpha(0.45f);
                 launchButton.setOnClickListener(v -> {
-                    if (!isRootfsValid()) {
-                        Toast.makeText(this, "Select a valid rootfs first.", Toast.LENGTH_SHORT).show();
-                        showScreen(R.id.nav_apps);
-                        return;
-                    }
                     Toast.makeText(this,
-                            "Rootfs validated. Guest execution is not implemented yet.",
+                            "Neutron's x86-64 execution runtime is not connected yet.",
                             Toast.LENGTH_LONG).show();
                 });
                 row.addView(launchButton);
@@ -488,7 +483,7 @@ public class MainActivity extends AppCompatActivity {
         addMemoryLimiterCard(content);
         addSettingsCard(content, "Graphics", "Vulkan and OpenGL", "Choose rendering mode, display resolution and frame-rate limits.");
         addSettingsCard(content, "Audio & input", "Devices and controls", "Configure audio output, touch controls, keyboard, mouse and gamepads.");
-        addSettingsCard(content, "Storage", "Root filesystem", "Manage the Linux root filesystem, shared folders and package storage.");
+        addSettingsCard(content, "Storage", "Neutron userspace", "Manage the app-private bin/, lib/, lib64/ and home/ directories.");
         addSettingsCard(content, "Appearance", "Dark theme", "Dark mode is the default Neutron appearance in this first UI build.");
 
         TextView version = text("NEUTRON 0.1.0 · ANDROID UI PREVIEW", 10, R.color.neutron_muted, true);
