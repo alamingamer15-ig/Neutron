@@ -46,6 +46,7 @@ add_library(neutron_native SHARED
     src/zydis_decoder.cpp
     src/audio_jni.cpp
     src/terminal_output_jni.c
+    src/terminal_pty_jni.c
     ../core/audio/src/audio_output.cpp
     ../core/elf/src/elf_parser.cpp
     ../core/elf/src/elf_validator.cpp
