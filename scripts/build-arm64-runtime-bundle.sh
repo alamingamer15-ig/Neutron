@@ -194,10 +194,11 @@ for binary in "$DEST"/usr/bin/* "$DEST"/usr/sbin/*; do
     [ -e "$binary" ] || continue
     if readelf -h "$binary" 2>/dev/null | grep -q 'Machine:.*AArch64'; then
         command="${binary##*/}"
+        program="${binary#"$DEST"}"
         [ -e "$DEST/neutron-bin/$command" ] && continue
         cat > "$DEST/neutron-bin/$command" <<EOF
 #!/system/bin/sh
-exec "\$PREFIX/neutron-bin/neutron-exec" "$command" "\$@"
+exec "\$PREFIX/neutron-bin/neutron-exec" "$program" "\$@"
 EOF
         chmod 0755 "$DEST/neutron-bin/$command"
     fi
