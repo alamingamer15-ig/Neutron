@@ -69,7 +69,8 @@ public class MainActivity extends AppCompatActivity {
         if (NeutronLog.init(getApplicationContext())) {
             NeutronLog.info("MainActivity", "Neutron application started");
         }
-        NeutronEnvironment.initialize(this);\n        setContentView(R.layout.activity_main);
+        NeutronEnvironment.initialize(this);
+        setContentView(R.layout.activity_main);
 
         toolbar = findViewById(R.id.toolbar);
         contentContainer = findViewById(R.id.content_container);
