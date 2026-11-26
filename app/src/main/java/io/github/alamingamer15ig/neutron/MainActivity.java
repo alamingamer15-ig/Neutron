@@ -35,6 +35,9 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 
+import com.termux.terminal.TerminalSession;
+import com.termux.view.TerminalView;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -338,232 +341,99 @@ public class MainActivity extends AppCompatActivity {
         return page;
     }
 
-    private NeutronPty terminalPty;
-    private Thread terminalReaderThread;
-    private final ArrayList<String> terminalHistory = new ArrayList<>();
-    private int terminalHistoryIndex = 0;
+    private TerminalSession terminalSession;
+    private TerminalView terminalView;
+    private NeutronTermuxTerminalClient terminalClient;
 
-    private ScrollView buildTerminalScreen() {
+    private LinearLayout buildTerminalScreen() {
         closeTerminalSession();
         NeutronEnvironment environment = NeutronEnvironment.initialize(this);
-        ScrollView page = createPage();
-        LinearLayout content = pageContent(page);
 
-        content.addView(text("Neutron terminal", 25, R.color.neutron_text, true));
-        TextView subtitle = text("Persistent shell · PTY-backed session", 14,
-                R.color.neutron_muted, false);
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setPadding(dp(16), dp(12), dp(16), dp(12));
+
+        TextView heading = text("Neutron terminal", 22, R.color.neutron_text, true);
+        page.addView(heading);
+
+        TextView subtitle = text("Powered by the Termux terminal emulator · Neutron private prefix",
+                12, R.color.neutron_muted, false);
         LinearLayout.LayoutParams subtitleParams = params(-1, -2);
-        subtitleParams.topMargin = dp(6);
-        content.addView(subtitle, subtitleParams);
+        subtitleParams.topMargin = dp(4);
+        page.addView(subtitle, subtitleParams);
 
-        MaterialCardView environmentCard = card();
-        LinearLayout environmentBody = new LinearLayout(this);
-        environmentBody.setOrientation(LinearLayout.VERTICAL);
-        environmentBody.setPadding(dp(16), dp(15), dp(16), dp(15));
-        environmentBody.addView(text("NEUTRON PREFIX", 10, R.color.neutron_primary, true));
-        TextView path = text(environment.getRootDirectory().getAbsolutePath(), 12,
-                R.color.neutron_text, false);
+        TextView path = text(environment.getRootDirectory().getAbsolutePath(), 11,
+                R.color.neutron_muted, false);
         path.setTypeface(Typeface.MONOSPACE);
         LinearLayout.LayoutParams pathParams = params(-1, -2);
-        pathParams.topMargin = dp(7);
-        environmentBody.addView(path, pathParams);
-        TextView layout = text("bin/   lib/   lib64/   home/", 12,
-                R.color.neutron_muted, false);
-        layout.setTypeface(Typeface.MONOSPACE);
-        LinearLayout.LayoutParams layoutParams = params(-1, -2);
-        layoutParams.topMargin = dp(10);
-        environmentBody.addView(layout, layoutParams);
-        environmentCard.addView(environmentBody);
-        LinearLayout.LayoutParams environmentCardParams = params(-1, -2);
-        environmentCardParams.topMargin = dp(18);
-        content.addView(environmentCard, environmentCardParams);
+        pathParams.topMargin = dp(6);
+        pathParams.bottomMargin = dp(10);
+        page.addView(path, pathParams);
 
-        MaterialCardView terminalCard = card();
-        terminalCard.setCardBackgroundColor(0xFF0B1018);
-        LinearLayout terminal = new LinearLayout(this);
-        terminal.setOrientation(LinearLayout.VERTICAL);
-        terminal.setPadding(dp(16), dp(18), dp(16), dp(18));
-        terminal.addView(text("NEUTRON / INTERACTIVE SHELL", 10,
-                R.color.neutron_primary, true));
+        TerminalView view = new TerminalView(this, null);
+        view.setBackgroundColor(0xFF0B1018);
+        view.setTextSize(14);
+        view.setFocusable(true);
+        view.setFocusableInTouchMode(true);
+        view.setVerticalScrollBarEnabled(true);
+        LinearLayout.LayoutParams terminalParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
+        page.addView(view, terminalParams);
 
-        TextView transcript = text("", 13, R.color.neutron_text, false);
-        transcript.setTypeface(Typeface.MONOSPACE);
-        transcript.setLineSpacing(dp(4), 1.0f);
-        transcript.setTextIsSelectable(true);
-        LinearLayout.LayoutParams transcriptParams = params(-1, -2);
-        transcriptParams.topMargin = dp(14);
-        terminal.addView(transcript, transcriptParams);
+        if (!environment.isReady()) {
+            TextView error = text("Neutron's private prefix is unavailable.", 13,
+                    R.color.neutron_muted, false);
+            page.addView(error);
+            return page;
+        }
 
-        EditText command = new EditText(this);
-        command.setSingleLine(true);
-        command.setTextSize(13);
-        command.setTypeface(Typeface.MONOSPACE);
-        command.setHint("Type a command and press Enter");
-        command.setInputType(InputType.TYPE_CLASS_TEXT
-                | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        command.setImeOptions(EditorInfo.IME_ACTION_DONE);
-        command.setEnabled(environment.isReady());
-        command.setFocusableInTouchMode(true);
-        command.setOnClickListener(v -> showTerminalKeyboard(command));
-        command.setOnFocusChangeListener((v, hasFocus) -> {
-            if (hasFocus) command.post(() -> showTerminalKeyboard(command));
-        });
+        try {
+            terminalView = view;
+            terminalClient = new NeutronTermuxTerminalClient(this, view);
+            view.setTerminalViewClient(terminalClient);
 
-        command.setOnKeyListener((view, keyCode, event) -> {
-            if (event.getAction() != android.view.KeyEvent.ACTION_DOWN) return false;
-            if (keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP) {
-                if (!terminalHistory.isEmpty()) {
-                    terminalHistoryIndex = Math.max(0, terminalHistoryIndex - 1);
-                    command.setText(terminalHistory.get(terminalHistoryIndex));
-                    command.setSelection(command.length());
-                }
-                return true;
-            }
-            if (keyCode == android.view.KeyEvent.KEYCODE_DPAD_DOWN) {
-                if (terminalHistoryIndex < terminalHistory.size() - 1) {
-                    terminalHistoryIndex++;
-                    command.setText(terminalHistory.get(terminalHistoryIndex));
-                } else {
-                    terminalHistoryIndex = terminalHistory.size();
-                    command.setText("");
-                }
-                command.setSelection(command.length());
-                return true;
-            }
-            return false;
-        });
-        LinearLayout.LayoutParams commandParams = params(-1, -2);
-        commandParams.topMargin = dp(10);
-        terminal.addView(command, commandParams);
+            String prefix = environment.getRootDirectory().getAbsolutePath();
+            String home = environment.getHomeDirectory().getAbsolutePath();
+            String[] shellArgs = {"/system/bin/sh", "-i"};
+            String[] shellEnvironment = {
+                    "HOME=" + home,
+                    "PREFIX=" + prefix,
+                    "PATH=" + prefix + "/bin:/system/bin:/system/xbin",
+                    "SHELL=/system/bin/sh",
+                    "TERM=xterm-256color",
+                    "LANG=C.UTF-8",
+                    "USER=neutron",
+                    "PS1=neutron:\\w $ "
+            };
 
-        LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        actions.setGravity(Gravity.CENTER_VERTICAL);
-        MaterialButton execute = button("Send");
-        MaterialButton interrupt = button("Ctrl+C");
-        LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(0, -2, 1);
-        actionParams.topMargin = dp(8);
-        actions.addView(execute, actionParams);
-        LinearLayout.LayoutParams interruptParams = new LinearLayout.LayoutParams(0, -2, 1);
-        interruptParams.leftMargin = dp(8);
-        interruptParams.topMargin = dp(8);
-        actions.addView(interrupt, interruptParams);
-        terminal.addView(actions);
-
-        TextView backendInfo = text(
-                "The shell process stays alive between commands. Its current directory and exported variables persist. Linux/glibc packages are not installed yet.",
-                12, R.color.neutron_muted, false);
-        LinearLayout.LayoutParams backendInfoParams = params(-1, -2);
-        backendInfoParams.topMargin = dp(12);
-        terminal.addView(backendInfo, backendInfoParams);
-
-        terminalCard.addView(terminal);
-        LinearLayout.LayoutParams terminalParams = params(-1, -2);
-        terminalParams.topMargin = dp(16);
-        content.addView(terminalCard, terminalParams);
-
-        if (environment.isReady()) {
-            try {
-                NeutronPty session = NeutronPty.start(environment);
-                terminalPty = session;
-                transcript.append("Neutron shell starting…\n");
-                execute.setEnabled(true);
-                execute.setOnClickListener(v -> sendTerminalInput(command, session));
-                command.setOnEditorActionListener((view, actionId, event) -> {
-                    if (actionId == EditorInfo.IME_ACTION_DONE
-                            || actionId == EditorInfo.IME_ACTION_GO
-                            || actionId == EditorInfo.IME_ACTION_SEND) {
-                        sendTerminalInput(command, session);
-                        return true;
-                    }
-                    return false;
-                });
-                interrupt.setOnClickListener(v -> session.write("\u0003"));
-                terminalReaderThread = new Thread(() -> {
-                    byte[] buffer = new byte[4096];
-                    try {
-                        while (!session.isClosed()) {
-                            int count = session.read(buffer);
-                            if (count < 0) break;
-                            if (count == 0) continue;
-                            String chunk = new String(buffer, 0, count,
-                                    java.nio.charset.StandardCharsets.UTF_8);
-                            runOnUiThread(() -> {
-                                if (terminalPty != session) return;
-                                transcript.append(chunk);
-                                if (transcript.length() > 60000) {
-                                    transcript.setText(transcript.getText().subSequence(
-                                            transcript.length() - 40000, transcript.length()));
-                                }
-                                page.post(() -> page.fullScroll(View.FOCUS_DOWN));
-                            });
-                        }
-                    } catch (RuntimeException error) {
-                        runOnUiThread(() -> {
-                            if (terminalPty == session) {
-                                transcript.append("\n[terminal reader error: "
-                                        + error.getMessage() + "]\n");
-                            }
-                        });
-                    } finally {
-                        session.destroy();
-                        runOnUiThread(() -> {
-                            if (terminalPty == session) {
-                                terminalPty = null;
-                                transcript.append("\n[session ended]\n");
-                                command.setEnabled(false);
-                                execute.setEnabled(false);
-                            }
-                        });
-                    }
-                }, "neutron-pty-reader");
-                terminalReaderThread.start();
-            } catch (Exception error) {
-                transcript.setText("Unable to start Neutron shell: "
-                        + error.getClass().getSimpleName() + ": "
-                        + String.valueOf(error.getMessage()) + "\n");
-                command.setEnabled(false);
-                execute.setEnabled(false);
-            }
-        } else {
-            transcript.setText("Neutron userspace directories are unavailable.\n");
-            command.setEnabled(false);
-            execute.setEnabled(false);
+            terminalSession = new TerminalSession(
+                    "/system/bin/sh",
+                    home,
+                    shellArgs,
+                    shellEnvironment,
+                    2000,
+                    terminalClient
+            );
+            view.attachSession(terminalSession);
+            view.requestFocus();
+        } catch (Throwable error) {
+            terminalSession = null;
+            terminalView = null;
+            terminalClient = null;
+            Toast.makeText(this, "Could not start Termux terminal: "
+                    + error.getClass().getSimpleName() + ": "
+                    + String.valueOf(error.getMessage()), Toast.LENGTH_LONG).show();
         }
 
         return page;
     }
 
-    private void sendTerminalInput(EditText command, NeutronPty session) {
-        String entered = command.getText().toString();
-        if (entered.isEmpty() || session == null || session.isClosed()) return;
-        command.setText("");
-        if (terminalHistory.isEmpty()
-                || !terminalHistory.get(terminalHistory.size() - 1).equals(entered)) {
-            terminalHistory.add(entered);
-            if (terminalHistory.size() > 200) terminalHistory.remove(0);
-        }
-        terminalHistoryIndex = terminalHistory.size();
-        InputMethodManager imm = (InputMethodManager) getSystemService(
-                Context.INPUT_METHOD_SERVICE);
-        if (imm != null) imm.hideSoftInputFromWindow(command.getWindowToken(), 0);
-        session.write(entered + "\n");
-    }
-
     private void closeTerminalSession() {
-        NeutronPty session = terminalPty;
-        terminalPty = null;
-        if (session != null) session.close();
-    }
-
-    private void showTerminalKeyboard(EditText command) {
-        if (!command.isEnabled()) return;
-        command.requestFocus();
-        command.post(() -> {
-            InputMethodManager imm = (InputMethodManager) getSystemService(
-                    Context.INPUT_METHOD_SERVICE);
-            if (imm != null) imm.showSoftInput(command, InputMethodManager.SHOW_IMPLICIT);
-        });
+        TerminalSession session = terminalSession;
+        terminalSession = null;
+        terminalView = null;
+        terminalClient = null;
+        if (session != null) session.finishIfRunning();
     }
 
     private ScrollView buildSettingsScreen() {
