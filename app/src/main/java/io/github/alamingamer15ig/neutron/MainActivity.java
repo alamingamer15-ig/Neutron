@@ -387,13 +387,13 @@ public class MainActivity extends AppCompatActivity {
             String home = environment.getHomeDirectory().getAbsolutePath();
             boolean bootstrapInstalled = NeutronBootstrapInstaller.isInstalled(environment);
             String shellPath = bootstrapInstalled
-                    ? prefix + "/bin/bash" : "/system/bin/sh";
+                    ? prefix + "/neutron-bin/bash" : "/system/bin/sh";
             String[] shellArgs = bootstrapInstalled
                     ? new String[]{"-l", "-i"} : new String[]{"/system/bin/sh", "-i"};
             String[] shellEnvironment = {
                     "HOME=" + home,
                     "PREFIX=" + prefix,
-                    "PATH=" + prefix + "/bin:/system/bin:/system/xbin",
+                    "PATH=" + prefix + "/neutron-bin:" + prefix + "/bin:/system/bin:/system/xbin",
                     "SHELL=" + shellPath,
                     "TERM=xterm-256color",
                     "LANG=C.UTF-8",
