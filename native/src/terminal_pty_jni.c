@@ -4,6 +4,8 @@
 #include <jni.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
+#include <stdio.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdatomic.h>
@@ -84,9 +86,11 @@ Java_io_github_alamingamer15ig_neutron_NeutronPty_nativeStart(
         if (slave > STDERR_FILENO) close(slave);
 
         if (chdir(home) != 0) _exit(126);
+        char path_value[PATH_MAX];
+        (void) snprintf(path_value, sizeof(path_value), "%s:/system/bin:/system/xbin", bin);
         (void) setenv("HOME", home, 1);
         (void) setenv("PREFIX", prefix, 1);
-        (void) setenv("PATH", bin, 1);
+        (void) setenv("PATH", path_value, 1);
         (void) setenv("SHELL", "/system/bin/sh", 1);
         (void) setenv("TERM", "xterm-256color", 1);
         (void) setenv("LANG", "C.UTF-8", 1);
@@ -201,7 +205,9 @@ Java_io_github_alamingamer15ig_neutron_NeutronPty_nativeStop(
     if (session == NULL) return;
     if (atomic_exchange(&session->closed, 1) == 0) {
         (void) kill(-session->child_pid, SIGHUP);
+        (void) kill(session->child_pid, SIGHUP);
         (void) kill(-session->child_pid, SIGTERM);
+        (void) kill(session->child_pid, SIGTERM);
     }
 }
 
@@ -214,6 +220,7 @@ Java_io_github_alamingamer15ig_neutron_NeutronPty_nativeDestroy(
     if (session == NULL) return;
     atomic_store(&session->closed, 1);
     (void) kill(-session->child_pid, SIGKILL);
+    (void) kill(session->child_pid, SIGKILL);
     close(session->master_fd);
 
     int status = 0;
