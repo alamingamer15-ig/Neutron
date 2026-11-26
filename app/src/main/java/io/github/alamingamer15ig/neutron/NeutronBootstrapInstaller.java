@@ -28,10 +28,10 @@ public final class NeutronBootstrapInstaller {
         if (environment == null || !environment.isReady()) return false;
         File prefix = environment.getRootDirectory();
         return new File(prefix, MARKER).isFile()
-                && new File(prefix, "bin/bash").canExecute()
-                && new File(prefix, "bin/pkg").canExecute()
-                && new File(prefix, "bin/apt-get").canExecute()
-                && new File(prefix, "bin/dpkg").canExecute()
+                && new File(prefix, "neutron-bin/bash").canExecute()
+                && new File(prefix, "neutron-bin/pkg").canExecute()
+                && new File(prefix, "neutron-bin/apt-get").canExecute()
+                && new File(prefix, "neutron-bin/dpkg").canExecute()
                 && new File(prefix, "var/lib/dpkg/status").isFile();
     }
 
@@ -60,15 +60,16 @@ public final class NeutronBootstrapInstaller {
             requireFile(staging, "usr/bin/tar");
             requireFile(staging, "var/lib/dpkg/status");
             requireFile(staging, "etc/apt/sources.list");
-            requireFile(staging, "bin/neutron-exec");
-            requireFile(staging, "bin/pkg");
+            requireFile(staging, "neutron-bin/neutron-exec");
+            requireFile(staging, "neutron-bin/pkg");
             requireFile(staging, "libexec/apt-methods/http");
 
             replaceDirectory(new File(staging, "usr"), new File(prefix, "usr"));
             replaceDirectory(new File(staging, "etc"), new File(prefix, "etc"));
             replaceDirectory(new File(staging, "var"), new File(prefix, "var"));
             replaceDirectory(new File(staging, "libexec"), new File(prefix, "libexec"));
-            mergeDirectory(new File(staging, "bin"), new File(prefix, "bin"));
+            replaceSymlink(new File(staging, "bin"), new File(prefix, "bin"));
+            mergeDirectory(new File(staging, "neutron-bin"), new File(prefix, "neutron-bin"));
 
             File marker = new File(prefix, MARKER);
             try (FileOutputStream output = new FileOutputStream(marker, false)) {
@@ -179,6 +180,22 @@ public final class NeutronBootstrapInstaller {
         deleteRecursively(destination);
         if (!source.renameTo(destination)) {
             throw new IOException("Could not install bootstrap directory: " + destination.getName());
+        }
+    }
+
+    private static void replaceSymlink(File source, File destination) throws IOException {
+        if (!isSymlink(source)) throw new IOException("Bootstrap /bin symlink is missing");
+        String linkTarget;
+        try {
+            linkTarget = Os.readlink(source.getAbsolutePath());
+        } catch (Exception error) {
+            throw new IOException("Could not read bootstrap /bin symlink", error);
+        }
+        deleteRecursively(destination);
+        try {
+            Os.symlink(linkTarget, destination.getAbsolutePath());
+        } catch (Exception error) {
+            throw new IOException("Could not install Neutron /bin symlink", error);
         }
     }
 
