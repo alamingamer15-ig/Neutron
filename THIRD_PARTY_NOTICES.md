@@ -57,14 +57,14 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-\n\n## Apache Commons Compress\n\nNeutron uses Apache Commons Compress 1.27.1 (Apache License 2.0) to safely read the compressed Alpine minirootfs archive.\n
+\n\n## Apache Commons Compress\n\nNeutron uses Apache Commons Compress 1.27.1 (Apache License 2.0) to safely read Neutron's compressed ARM64 runtime bundle.\n
 ## Ubuntu 24.04 ARM64 Wayland and X11 runtime packages
 
 The offline runtime bundle includes selected ARM64 binary packages from the official Ubuntu 24.04 repositories for Wayland and X11 runtime libraries. The exact package names, versions, and architectures are recorded in `usr/share/neutron/runtime-packages.txt` inside the installed prefix. Package copyright and license files shipped under `/usr/share/doc` are retained in the bundle under the Neutron prefix. Each package remains subject to its own upstream license.
 
 ## Android-compatible GNU C Library (glibc) 2.42.9
 
-Neutron packages the AArch64 dynamic loader and rootfs runtime libraries from
+Neutron packages the AArch64 dynamic loader and glibc runtime libraries from
 [jjtseng93/glibc-for-android-native](https://github.com/jjtseng93/glibc-for-android-native),
 pinned to commit `d7e375f9145b2041f479416eccfc924fd3bde3d6`. This is a modified
 GNU C Library build intended to avoid Android app-sandbox SIGSYS failures. Its
