@@ -208,8 +208,8 @@ public final class NeutronRuntimeInstaller {
     private static String grunScript() {
         return "#!/system/bin/sh\n"
                 + "set -eu\n"
-                + ": \"\${PREFIX:?Neutron PREFIX is not set}\"\n"
-                + "GLIBC_ROOT=\"\${GLIBC_PREFIX:-$PREFIX/glibc}\"\n"
+                + ": \"${PREFIX:?Neutron PREFIX is not set}\"\n"
+                + "GLIBC_ROOT=\"${GLIBC_PREFIX:-$PREFIX/glibc}\"\n"
                 + "LOADER=\"$GLIBC_ROOT/lib/ld-linux-aarch64.so.1\"\n"
                 + "if [ ! -x \"$LOADER\" ]; then echo 'Neutron glibc runtime is missing' >&2; exit 127; fi\n"
                 + "if [ \"$#\" -eq 0 ]; then exec \"$LOADER\" --help; fi\n"
