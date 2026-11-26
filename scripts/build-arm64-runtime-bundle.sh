@@ -163,7 +163,8 @@ exec "$PREFIX/bin/neutron-exec" apt-get -o "Dir::Root=$PREFIX" \
     -o "Dir::Cache=$PREFIX/var/cache/apt" \
     -o "Dir::Etc::sourcelist=$PREFIX/etc/apt/sources.list" \
     -o "Dir::Etc::sourceparts=-" \
-    -o "Dir::Bin::dpkg=$PREFIX/bin/dpkg" "$@"
+    -o "Dir::Bin::dpkg=$PREFIX/bin/dpkg" \
+    -o "Dir::Bin::Methods=$PREFIX/usr/lib/apt/methods" "$@"
 EOF
 cat > "$DEST/bin/apt" <<'EOF'
 #!/system/bin/sh
@@ -186,7 +187,8 @@ exec "$PREFIX/bin/neutron-exec" apt-cache -o "Dir::Root=$PREFIX" \
     -o "Dir::State::lists=$PREFIX/var/lib/apt/lists" \
     -o "Dir::Cache=$PREFIX/var/cache/apt" \
     -o "Dir::Etc::sourcelist=$PREFIX/etc/apt/sources.list" \
-    -o "Dir::Etc::sourceparts=-" "$@"
+    -o "Dir::Etc::sourceparts=-" \
+    -o "Dir::Bin::Methods=$PREFIX/usr/lib/apt/methods" "$@"
 EOF
 cat > "$DEST/bin/dpkg" <<'EOF'
 #!/system/bin/sh
