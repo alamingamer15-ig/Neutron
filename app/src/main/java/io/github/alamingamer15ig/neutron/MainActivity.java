@@ -254,7 +254,6 @@ public class MainActivity extends AppCompatActivity {
         subtitleParams.topMargin = dp(6);
         content.addView(subtitle, subtitleParams);
 
-        addRootfsCard(content);
 
         MaterialButton chooseButton = button("Choose an ELF file");
         chooseButton.setIconResource(android.R.drawable.ic_menu_add);
