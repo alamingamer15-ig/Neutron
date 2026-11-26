@@ -148,6 +148,7 @@ Java_io_github_alamingamer15ig_neutron_NeutronPty_nativeRead(
     if (ready < 0) return errno == EINTR ? 0 : -1;
 
     ssize_t count = read(session->master_fd, buffer, (size_t) amount);
+    if (count < 0 && (errno == EINTR || errno == EAGAIN)) return 0;
     if (count <= 0) return -1;
     (*env)->SetByteArrayRegion(env, output, 0, (jsize) count, (const jbyte *) buffer);
     return (jint) count;
