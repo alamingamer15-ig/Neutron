@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-MODE="${1:?usage: install-android-glibc.sh apk <jniLibs-dir> | rootfs <target-dir>}"
+MODE="${1:?usage: install-android-glibc.sh apk <jniLibs-dir> | runtime <target-dir>}"
 DEST="${2:?destination is required}"
 UPSTREAM_COMMIT="d7e375f9145b2041f479416eccfc924fd3bde3d6"
 BASE_URL="https://raw.githubusercontent.com/jjtseng93/glibc-for-android-native/${UPSTREAM_COMMIT}"
@@ -36,7 +36,7 @@ case "$MODE" in
         install -m 0755 "$WORK/ld.so" "$DEST/libldcustom.so"
         echo "Installed pinned Android-compatible AArch64 loader: $DEST/libldcustom.so"
         ;;
-    rootfs)
+    runtime)
         mkdir -p "$DEST/lib" "$DEST/lib64"
         fetch_verified libc.so.6 9b2aafea50d220b3512c6d38074627bc01d8c08d "$WORK/libc.so.6"
         fetch_verified libdl.so.2 020692fd584c95ac53dcb9353df5f5dc461bfa54 "$WORK/libdl.so.2"
@@ -48,7 +48,7 @@ case "$MODE" in
             rm -f "$DEST/lib/$library"
             install -m 0755 "$WORK/$library" "$DEST/lib/$library"
         done
-        # Some AArch64 rootfs layouts make /lib64 a symlink to /lib.
+        # Some AArch64 runtime layouts make /lib64 a symlink to /lib.
         # Creating /lib64/ld-linux here would then replace the real loader in
         # /lib with a self-referential symlink. The /lib loader is sufficient
         # in that layout; only add the compatibility alias for a real directory.
