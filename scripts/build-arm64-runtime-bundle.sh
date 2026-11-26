@@ -176,7 +176,8 @@ exec "$PREFIX/bin/neutron-exec" apt -o "Dir::Root=$PREFIX" \
     -o "Dir::Cache=$PREFIX/var/cache/apt" \
     -o "Dir::Etc::sourcelist=$PREFIX/etc/apt/sources.list" \
     -o "Dir::Etc::sourceparts=-" \
-    -o "Dir::Bin::dpkg=$PREFIX/bin/dpkg" "$@"
+    -o "Dir::Bin::dpkg=$PREFIX/bin/dpkg" \
+    -o "Dir::Bin::Methods=$PREFIX/usr/lib/apt/methods" "$@"
 EOF
 cat > "$DEST/bin/apt-cache" <<'EOF'
 #!/system/bin/sh
