@@ -75,3 +75,8 @@ the pinned upstream repository: [glibc source archive](https://github.com/jjtsen
 and [LGPL-2.1 license](https://github.com/jjtseng93/glibc-for-android-native/blob/d7e375f9145b2041f479416eccfc924fd3bde3d6/LICENSE). A copy of the license and the upstream patch notes are also retained under `licenses/` in this repository.
 The build downloads only pinned artifacts and verifies their Git blob object
 IDs before packaging. The loader and libraries remain under the GNU LGPL terms.
+
+
+## Termux terminal libraries 0.118.0
+
+Neutron uses the upstream `terminal-view` and `terminal-emulator` Android library modules from [termux/termux-app](https://github.com/termux/termux-app), pinned to version `0.118.0`. These reusable library modules are licensed under Apache License 2.0; this does not relicense or include the full Termux application, which is GPL-3.0-only. See [Termux's license information](https://github.com/termux/termux-app/blob/master/LICENSE.md) and the included Apache-2.0 license text at `licenses/Apache-2.0-Termux-terminal-libraries.txt`.
