@@ -211,10 +211,19 @@ public final class NeutronRuntimeInstaller {
                 + ": \"${PREFIX:?Neutron PREFIX is not set}\"\n"
                 + "GLIBC_ROOT=\"${GLIBC_PREFIX:-$PREFIX/glibc}\"\n"
                 + "LOADER=\"$GLIBC_ROOT/lib/ld-linux-aarch64.so.1\"\n"
-                + "if [ ! -x \"$LOADER\" ]; then echo 'Neutron glibc runtime is missing' >&2; exit 127; fi\n"
-                + "if [ \"$#\" -eq 0 ]; then exec \"$LOADER\" --help; fi\n"
+                + "if [ ! -x \"$LOADER\" ]; then echo \"Neutron glibc runtime is missing\" >&2; exit 127; fi\n"
+                + "if [ \"$#\" -eq 0 ] || [ \"$1\" = \"--help\" ] || [ \"$1\" = \"--version\" ]; then exec \"$LOADER\" \"$@\"; fi\n"
+                + "PROGRAM=\"$1\"\n"
+                + "shift\n"
+                + "case \"$PROGRAM\" in\n"
+                + "  \"$PREFIX\"/*) ;;\n"
+                + "  /*) PROGRAM=\"$PREFIX$PROGRAM\" ;;\n"
+                + "  */*) PROGRAM=\"$PWD/$PROGRAM\" ;;\n"
+                + "  *) if [ -x \"$PREFIX/usr/bin/$PROGRAM\" ]; then PROGRAM=\"$PREFIX/usr/bin/$PROGRAM\"; elif [ -x \"$PREFIX/bin/$PROGRAM\" ]; then PROGRAM=\"$PREFIX/bin/$PROGRAM\"; else echo \"grun: command not found: $PROGRAM\" >&2; exit 127; fi ;;\n"
+                + "esac\n"
+                + "if [ ! -x \"$PROGRAM\" ]; then echo \"grun: not executable: $PROGRAM\" >&2; exit 126; fi\n"
                 + "LIBPATH=\"$GLIBC_ROOT/lib:$PREFIX/usr/lib/aarch64-linux-gnu:$PREFIX/usr/lib:$PREFIX/lib:$PREFIX/lib64\"\n"
-                + "exec \"$LOADER\" --library-path \"$LIBPATH\" \"$@\"\n";
+                + "exec \"$LOADER\" --library-path \"$LIBPATH\" \"$PROGRAM\" \"$@\"\n";
     }
 
     private static String checkScript() {
