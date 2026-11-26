@@ -608,7 +608,7 @@ public class MainActivity extends AppCompatActivity {
         body.addView(heading, headingParams);
 
         TextView description = text(
-                "Install the patched glibc runtime, Wayland client/server libraries, X11 libraries and diagnostic tools. This is an offline install from the APK; it does not start a desktop display server.",
+                "Install the patched glibc runtime, Wayland client/server libraries and X11 runtime libraries. This is an offline install from the APK; it does not start a desktop display server.",
                 12, R.color.neutron_muted, false);
         LinearLayout.LayoutParams descriptionParams = params(-1, -2);
         descriptionParams.topMargin = dp(8);
