@@ -294,7 +294,7 @@ tar --hard-dereference -czf "$ASSET_DIR/neutron-runtime-arm64.tar.gz" \
     -C "$DEST" glibc usr
 tar -tzf "$ASSET_DIR/neutron-runtime-arm64.tar.gz" >/dev/null
 tar --hard-dereference -czf "$ASSET_DIR/neutron-bootstrap-arm64.tar.gz" \
-    -C "$DEST" bin etc usr var
+    -C "$DEST" bin etc libexec usr var
 tar -tzf "$ASSET_DIR/neutron-bootstrap-arm64.tar.gz" >/dev/null
 echo "Created Neutron ARM64 glibc + Wayland + X11 runtime bundle"
 echo "Created Neutron ARM64 bootstrap (bash, coreutils, apt, dpkg, pkg, tar, gzip)"
