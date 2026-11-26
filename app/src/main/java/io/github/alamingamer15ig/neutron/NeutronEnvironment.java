@@ -106,7 +106,9 @@ public final class NeutronEnvironment {
                         output.write(buffer, 0, accepted);
                         total += accepted;
                     }
-                    if (total >= limit) break;
+                    // Keep draining the pipe after the display limit so the child
+                    // cannot block forever on a full stdout pipe.
+
                 }
             }
             int exitCode = process.waitFor();
