@@ -62,7 +62,7 @@ sudo apt-get install -y --download-only --no-install-recommends \
     libxdmcp6:arm64
 
 # Install the pinned Android-sandbox-compatible glibc loader and core DSOs.
-sh "$ROOT/scripts/install-android-glibc.sh" rootfs "$DEST/glibc"
+sh "$ROOT/scripts/install-android-glibc.sh" runtime "$DEST/glibc"
 
 # Extract the resolved arm64 package dependency closure. The libc6 package is
 # intentionally omitted: Neutron supplies its pinned patched glibc instead.
