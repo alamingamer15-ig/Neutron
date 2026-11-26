@@ -32,7 +32,7 @@ sudo apt-get install -y --no-install-recommends dpkg-dev binutils
 sudo apt-get install -y --download-only --no-install-recommends \
     bash:arm64 dash:arm64 coreutils:arm64 tar:arm64 gzip:arm64 xz-utils:arm64 \
     findutils:arm64 grep:arm64 sed:arm64 gawk:arm64 \
-    dpkg:arm64 apt:arm64 ca-certificates:arm64 curl:arm64 wget:arm64 \
+    dpkg:arm64 apt:arm64 ca-certificates:arm64 curl:arm64 wget:arm64 ubuntu-keyring:arm64 \
     libwayland-client0:arm64 \
     libwayland-server0:arm64 \
     libwayland-cursor0:arm64 \
@@ -95,6 +95,7 @@ for required in bash coreutils tar gzip findutils grep sed gawk dpkg apt; do
     grep -q "^$required " "$PACKAGE_LIST"
     printf '%s\n' "$required" >> "$BOOTSTRAP_LIST"
 done
+printf '%s\n' curl wget xz-utils ubuntu-keyring >> "$BOOTSTRAP_LIST"
 grep -q '^libwayland-client0 ' "$PACKAGE_LIST"
 grep -q '^libwayland-server0 ' "$PACKAGE_LIST"
 grep -q '^libx11-6 ' "$PACKAGE_LIST"
@@ -107,9 +108,9 @@ test -x "$DEST/usr/bin/ls"
 test -x "$DEST/usr/bin/tar"
 
 cat > "$DEST/etc/apt/sources.list" <<'EOF'
-deb http://ports.ubuntu.com/ubuntu-ports noble main universe
-deb http://ports.ubuntu.com/ubuntu-ports noble-updates main universe
-deb http://ports.ubuntu.com/ubuntu-ports noble-security main universe
+deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] http://ports.ubuntu.com/ubuntu-ports noble main universe
+deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] http://ports.ubuntu.com/ubuntu-ports noble-updates main universe
+deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] http://ports.ubuntu.com/ubuntu-ports noble-security main universe
 EOF
 cat > "$DEST/etc/apt/apt.conf" <<'EOF'
 Dir "/";
@@ -161,7 +162,8 @@ exec "$PREFIX/bin/neutron-exec" apt-get -o "Dir::Root=$PREFIX" \
     -o "Dir::State::lists=$PREFIX/var/lib/apt/lists" \
     -o "Dir::Cache=$PREFIX/var/cache/apt" \
     -o "Dir::Etc::sourcelist=$PREFIX/etc/apt/sources.list" \
-    -o "Dir::Etc::sourceparts=-" "$@"
+    -o "Dir::Etc::sourceparts=-" \
+    -o "Dir::Bin::dpkg=$PREFIX/bin/dpkg" "$@"
 EOF
 cat > "$DEST/bin/apt" <<'EOF'
 #!/system/bin/sh
@@ -172,7 +174,8 @@ exec "$PREFIX/bin/neutron-exec" apt -o "Dir::Root=$PREFIX" \
     -o "Dir::State::lists=$PREFIX/var/lib/apt/lists" \
     -o "Dir::Cache=$PREFIX/var/cache/apt" \
     -o "Dir::Etc::sourcelist=$PREFIX/etc/apt/sources.list" \
-    -o "Dir::Etc::sourceparts=-" "$@"
+    -o "Dir::Etc::sourceparts=-" \
+    -o "Dir::Bin::dpkg=$PREFIX/bin/dpkg" "$@"
 EOF
 cat > "$DEST/bin/apt-cache" <<'EOF'
 #!/system/bin/sh
