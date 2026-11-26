@@ -36,8 +36,8 @@ jobs:
           sh scripts/install-android-glibc.sh apk app/src/main/jniLibs/arm64-v8a
           readelf -h app/src/main/jniLibs/arm64-v8a/libldcustom.so | grep 'Machine:.*AArch64'
 
-      - name: Build Neutron ARM64 runtime and bootstrap bundles
-        run: sh scripts/build-arm64-runtime-bundle.sh
+      - name: Build Neutron-specific Termux bootstrap
+        run: sh scripts/build-termux-bootstrap.sh
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -56,64 +56,40 @@ jobs:
       - name: Build debug APK
         run: gradle assembleDebug
 
-      - name: Verify ARM64 runtime bundle and native libraries are packaged
+      - name: Verify Neutron Termux bootstrap is packaged
         shell: bash
         run: |
           set -euo pipefail
           APK="app/build/outputs/apk/debug/app-debug.apk"
           APK_ENTRIES="$(mktemp)"
-          RUNTIME_ARCHIVE="$(mktemp)"
-          RUNTIME_ENTRIES="$(mktemp)"
-          trap 'rm -f "$APK_ENTRIES" "$RUNTIME_ARCHIVE" "$RUNTIME_ENTRIES"' EXIT
+          BOOTSTRAP_ARCHIVE="$(mktemp)"
+          BOOTSTRAP_ENTRIES="$(mktemp)"
+          trap 'rm -f "$APK_ENTRIES" "$BOOTSTRAP_ARCHIVE" "$BOOTSTRAP_ENTRIES"' EXIT
 
-          # Use unzip's name-only listing instead of parsing the formatted
-          # columns from "unzip -l".
           unzip -Z1 "$APK" > "$APK_ENTRIES"
           require_apk_entry() {
             local entry="$1"
             if ! grep -Fxq -- "$entry" "$APK_ENTRIES"; then
               echo "::error::APK is missing required entry: $entry"
-              echo "APK entries:"
               cat "$APK_ENTRIES"
               exit 1
             fi
-            echo "Verified APK entry: $entry"
           }
 
           require_apk_entry "lib/arm64-v8a/libc++_shared.so"
           require_apk_entry "lib/arm64-v8a/libldcustom.so"
-          require_apk_entry "assets/neutron-runtime-arm64.tar"
-          require_apk_entry "assets/neutron-bootstrap-arm64.tar"
+          require_apk_entry "assets/neutron-bootstrap-arm64.zip"
 
-          unzip -p "$APK" assets/neutron-bootstrap-arm64.tar > "$RUNTIME_ARCHIVE"
-          test -s "$RUNTIME_ARCHIVE"
-          tar -tf "$RUNTIME_ARCHIVE" > "$RUNTIME_ENTRIES"
-          for entry in bin neutron-bin/pkg neutron-bin/bash neutron-bin/apt-get neutron-bin/apt-cache neutron-bin/apt-helper neutron-bin/dpkg neutron-bin/neutron-exec libexec/apt-methods/http usr/bin/bash usr/bin/apt-get usr/bin/dpkg usr/bin/ls usr/bin/tar etc/apt/sources.list var/lib/dpkg/status; do
-            if ! grep -Fxq -- "$entry" "$RUNTIME_ENTRIES"; then
-              echo "::error::Neutron bootstrap is missing required entry: $entry"
-              cat "$RUNTIME_ENTRIES"
+          unzip -p "$APK" assets/neutron-bootstrap-arm64.zip > "$BOOTSTRAP_ARCHIVE"
+          test -s "$BOOTSTRAP_ARCHIVE"
+          unzip -Z1 "$BOOTSTRAP_ARCHIVE" > "$BOOTSTRAP_ENTRIES"
+          for entry in SYMLINKS.txt bin/bash bin/pkg bin/apt-get bin/dpkg bin/ls bin/tar etc/apt/sources.list var/lib/dpkg/status; do
+            if ! grep -Fxq -- "$entry" "$BOOTSTRAP_ENTRIES"; then
+              echo "::error::Termux bootstrap is missing required entry: $entry"
+              cat "$BOOTSTRAP_ENTRIES"
               exit 1
             fi
-            echo "Verified bootstrap entry: $entry"
           done
-
-          unzip -p "$APK" assets/neutron-runtime-arm64.tar > "$RUNTIME_ARCHIVE"
-          test -s "$RUNTIME_ARCHIVE"
-          tar -tf "$RUNTIME_ARCHIVE" > "$RUNTIME_ENTRIES"
-
-          require_runtime_entry() {
-            local entry="$1"
-            if ! grep -Fxq -- "$entry" "$RUNTIME_ENTRIES"; then
-              echo "::error::ARM64 runtime archive is missing required entry: $entry"
-              echo "Runtime archive entries:"
-              cat "$RUNTIME_ENTRIES"
-              exit 1
-            fi
-            echo "Verified runtime entry: $entry"
-          }
-
-          require_runtime_entry "usr/lib/aarch64-linux-gnu/libwayland-client.so.0"
-          require_runtime_entry "usr/lib/aarch64-linux-gnu/libX11.so.6"
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
