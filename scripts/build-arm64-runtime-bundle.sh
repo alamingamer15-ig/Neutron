@@ -37,7 +37,6 @@ sudo apt-get install -y --download-only --no-install-recommends \
     libwayland-server0:arm64 \
     libwayland-cursor0:arm64 \
     libwayland-egl1:arm64 \
-    wayland-utils:arm64 \
     libx11-6:arm64 \
     libx11-xcb1:arm64 \
     libxext6:arm64 \
@@ -60,8 +59,7 @@ sudo apt-get install -y --download-only --no-install-recommends \
     libxcb-xinerama0:arm64 \
     libxcb-xkb1:arm64 \
     libxau6:arm64 \
-    libxdmcp6:arm64 \
-    x11-utils:arm64
+    libxdmcp6:arm64
 
 # Install the pinned Android-sandbox-compatible glibc loader and core DSOs.
 sh "$ROOT/scripts/install-android-glibc.sh" rootfs "$DEST/glibc"
@@ -88,12 +86,14 @@ done
 grep -q '^libwayland-client0 ' "$PACKAGE_LIST"
 grep -q '^libwayland-server0 ' "$PACKAGE_LIST"
 grep -q '^libx11-6 ' "$PACKAGE_LIST"
-grep -q '^wayland-utils ' "$PACKAGE_LIST"
-grep -q '^x11-utils ' "$PACKAGE_LIST"
+
+# Confirm the SONAME links needed by the dynamic loader survived extraction.
+test -e "$DEST/usr/lib/aarch64-linux-gnu/libwayland-client.so.0"
+test -e "$DEST/usr/lib/aarch64-linux-gnu/libX11.so.6"
 
 # Keep Debian copyright files in the bundle for license compliance.
 mkdir -p "$ASSET_DIR"
-tar -czf "$ASSET_DIR/neutron-runtime-arm64.tar.gz" -C "$DEST" glibc usr
+tar --hard-dereference -czf "$ASSET_DIR/neutron-runtime-arm64.tar.gz" -C "$DEST" glibc usr
 tar -tzf "$ASSET_DIR/neutron-runtime-arm64.tar.gz" >/dev/null
 echo "Created Neutron ARM64 glibc + Wayland + X11 runtime bundle"
 du -h "$ASSET_DIR/neutron-runtime-arm64.tar.gz"
