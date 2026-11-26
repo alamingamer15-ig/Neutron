@@ -6,14 +6,12 @@ ASSET_DIR="$ROOT/app/build/generated/neutronAssets"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT HUP INT TERM
 DEST="$STAGE/runtime"
-mkdir -p "$DEST/glibc/etc" "$DEST/usr/share/neutron"
+BOOT="$STAGE/bootstrap"
+mkdir -p "$DEST/glibc/etc" "$DEST/usr/share/neutron" "$BOOT"
 
-# Ubuntu 24.04 arm64 packages are used because they are glibc-linked and
-# compatible with Neutron's pinned patched glibc runtime.
+# Neutron's userspace is ARM64 glibc, not Termux/Bionic. Resolve one Ubuntu
+# ARM64 package closure for both the graphics runtime and base bootstrap.
 sudo dpkg --add-architecture arm64
-
-# The runner's default Ubuntu mirrors do not publish arm64 indexes. Keep those
-# sources amd64-only and use ports.ubuntu.com for the arm64 package set below.
 if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
     sudo sed -i '/^Architectures:/d; /^URIs:/a Architectures: amd64' \
         /etc/apt/sources.list.d/ubuntu.sources
@@ -21,7 +19,6 @@ fi
 if [ -f /etc/apt/sources.list ]; then
     sudo sed -i 's/^deb /deb [arch=amd64] /' /etc/apt/sources.list
 fi
-
 sudo tee /etc/apt/sources.list.d/neutron-arm64.sources >/dev/null <<'EOF'
 Types: deb
 URIs: http://ports.ubuntu.com/ubuntu-ports
@@ -33,6 +30,8 @@ EOF
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends dpkg-dev binutils
 sudo apt-get install -y --download-only --no-install-recommends \
+    bash dash coreutils tar gzip xz-utils findutils grep sed gawk \
+    dpkg apt ca-certificates curl wget \
     libwayland-client0:arm64 \
     libwayland-server0:arm64 \
     libwayland-cursor0:arm64 \
@@ -61,15 +60,16 @@ sudo apt-get install -y --download-only --no-install-recommends \
     libxau6:arm64 \
     libxdmcp6:arm64
 
-# Install the pinned Android-sandbox-compatible glibc loader and core DSOs.
 sh "$ROOT/scripts/install-android-glibc.sh" runtime "$DEST/glibc"
 
-# Extract the resolved arm64 package dependency closure. The libc6 package is
-# intentionally omitted: Neutron supplies its pinned patched glibc instead.
-mkdir -p "$STAGE/debs"
+mkdir -p "$STAGE/debs" "$DEST/var/lib/dpkg" "$DEST/var/cache/apt/archives" \
+    "$DEST/var/log/apt" "$DEST/etc/apt" "$DEST/bin"
 find /var/cache/apt/archives -maxdepth 1 -type f -name '*.deb' -exec cp {} "$STAGE/debs/" \;
 PACKAGE_LIST="$DEST/usr/share/neutron/runtime-packages.txt"
+BOOTSTRAP_LIST="$DEST/usr/share/neutron/bootstrap-packages.txt"
 : > "$PACKAGE_LIST"
+: > "$BOOTSTRAP_LIST"
+: > "$DEST/var/lib/dpkg/status"
 for package in "$STAGE"/debs/*.deb; do
     [ -f "$package" ] || continue
     architecture="$(dpkg-deb -f "$package" Architecture)"
@@ -81,19 +81,120 @@ for package in "$STAGE"/debs/*.deb; do
     fi
     printf '%s %s %s\n' "$name" "$version" "$architecture" >> "$PACKAGE_LIST"
     dpkg-deb -x "$package" "$DEST"
+    # Seed dpkg's database for the packages included in the offline bootstrap.
+    dpkg-deb -f "$package" >> "$DEST/var/lib/dpkg/status"
+    printf 'Status: install ok installed\n\n' >> "$DEST/var/lib/dpkg/status"
 done
 
+for required in bash coreutils tar gzip findutils grep sed gawk dpkg apt; do
+    grep -q "^$required " "$PACKAGE_LIST"
+    printf '%s\n' "$required" >> "$BOOTSTRAP_LIST"
+done
 grep -q '^libwayland-client0 ' "$PACKAGE_LIST"
 grep -q '^libwayland-server0 ' "$PACKAGE_LIST"
 grep -q '^libx11-6 ' "$PACKAGE_LIST"
-
-# Confirm the SONAME links needed by the dynamic loader survived extraction.
 test -e "$DEST/usr/lib/aarch64-linux-gnu/libwayland-client.so.0"
 test -e "$DEST/usr/lib/aarch64-linux-gnu/libX11.so.6"
+test -x "$DEST/usr/bin/bash"
+test -x "$DEST/usr/bin/apt-get"
+test -x "$DEST/usr/bin/dpkg"
+test -x "$DEST/usr/bin/ls"
+test -x "$DEST/usr/bin/tar"
 
-# Keep Debian copyright files in the bundle for license compliance.
+cat > "$DEST/etc/apt/sources.list" <<'EOF'
+deb http://ports.ubuntu.com/ubuntu-ports noble main universe
+deb http://ports.ubuntu.com/ubuntu-ports noble-updates main universe
+deb http://ports.ubuntu.com/ubuntu-ports noble-security main universe
+EOF
+cat > "$DEST/etc/apt/apt.conf" <<'EOF'
+Dir "/";
+APT::Architecture "arm64";
+APT::Architectures { "arm64"; };
+Acquire::Languages "none";
+Acquire::Retries "3";
+EOF
+
+cat > "$DEST/bin/neutron-exec" <<'EOF'
+#!/system/bin/sh
+set -eu
+: "${PREFIX:?Neutron PREFIX is not set}"
+LOADER="$PREFIX/glibc/lib/ld-linux-aarch64.so.1"
+LIBPATH="$PREFIX/glibc/lib:$PREFIX/usr/lib/aarch64-linux-gnu:$PREFIX/usr/lib:$PREFIX/lib:$PREFIX/lib64"
+if [ "$#" -lt 1 ]; then
+    echo "usage: neutron-exec PROGRAM [ARGS...]" >&2
+    exit 2
+fi
+PROGRAM="$1"
+shift
+case "$PROGRAM" in
+    /*) PROGRAM="$PREFIX$PROGRAM" ;;
+    */*) PROGRAM="$PREFIX/$PROGRAM" ;;
+    *) PROGRAM="$PREFIX/usr/bin/$PROGRAM" ;;
+esac
+exec "$LOADER" --library-path "$LIBPATH" "$PROGRAM" "$@"
+EOF
+chmod 0755 "$DEST/bin/neutron-exec"
+
+for command in bash apt apt-get dpkg ls cat cp mv rm mkdir rmdir chmod chown ln readlink \
+    pwd env printenv uname id whoami date sleep touch mkdir find xargs grep sed awk \
+    tar gzip xz curl wget; do
+    [ -e "$DEST/usr/bin/$command" ] || [ -L "$DEST/usr/bin/$command" ] || continue
+    cat > "$DEST/bin/$command" <<EOF
+#!/system/bin/sh
+exec "\$PREFIX/bin/neutron-exec" "$command" "\$@"
+EOF
+    chmod 0755 "$DEST/bin/$command"
+done
+
+# apt/dpkg must operate inside Neutron's private prefix, never Android's root.
+cat > "$DEST/bin/apt-get" <<'EOF'
+#!/system/bin/sh
+: "${PREFIX:?}"
+export APT_CONFIG="$PREFIX/etc/apt/apt.conf"
+exec "$PREFIX/bin/neutron-exec" apt-get -o "Dir::Root=$PREFIX" \
+    -o "Dir::State::status=$PREFIX/var/lib/dpkg/status" \
+    -o "Dir::State::lists=$PREFIX/var/lib/apt/lists" \
+    -o "Dir::Cache=$PREFIX/var/cache/apt" \
+    -o "Dir::Etc::sourcelist=$PREFIX/etc/apt/sources.list" \
+    -o "Dir::Etc::sourceparts=-" "$@"
+EOF
+cat > "$DEST/bin/apt" <<'EOF'
+#!/system/bin/sh
+exec "$PREFIX/bin/apt-get" "$@"
+EOF
+cat > "$DEST/bin/dpkg" <<'EOF'
+#!/system/bin/sh
+exec "$PREFIX/bin/neutron-exec" dpkg --root="$PREFIX" \
+    --admindir="$PREFIX/var/lib/dpkg" "$@"
+EOF
+cat > "$DEST/bin/pkg" <<'EOF'
+#!/system/bin/sh
+set -eu
+command="${1:-help}"
+[ "$#" -eq 0 ] || shift
+case "$command" in
+    update) exec "$PREFIX/bin/apt-get" update "$@" ;;
+    upgrade) exec "$PREFIX/bin/apt-get" upgrade "$@" ;;
+    install) exec "$PREFIX/bin/apt-get" install "$@" ;;
+    remove|uninstall) exec "$PREFIX/bin/apt-get" remove "$@" ;;
+    search) exec "$PREFIX/bin/apt-get" search "$@" ;;
+    show) exec "$PREFIX/bin/apt-get" show "$@" ;;
+    list) exec "$PREFIX/bin/apt-get" list "$@" ;;
+    help|-h|--help)
+        echo "Neutron pkg: update | upgrade | install PKG... | remove PKG... | search TERM | show PKG | list"
+        ;;
+    *) echo "pkg: unknown command: $command" >&2; exit 2 ;;
+esac
+EOF
+chmod 0755 "$DEST/bin/apt-get" "$DEST/bin/apt" "$DEST/bin/dpkg" "$DEST/bin/pkg"
+
 mkdir -p "$ASSET_DIR"
-tar --hard-dereference -czf "$ASSET_DIR/neutron-runtime-arm64.tar.gz" -C "$DEST" glibc usr
+tar --hard-dereference -czf "$ASSET_DIR/neutron-runtime-arm64.tar.gz" \
+    -C "$DEST" glibc usr
 tar -tzf "$ASSET_DIR/neutron-runtime-arm64.tar.gz" >/dev/null
+tar --hard-dereference -czf "$ASSET_DIR/neutron-bootstrap-arm64.tar.gz" \
+    -C "$DEST" bin etc usr var
+tar -tzf "$ASSET_DIR/neutron-bootstrap-arm64.tar.gz" >/dev/null
 echo "Created Neutron ARM64 glibc + Wayland + X11 runtime bundle"
-du -h "$ASSET_DIR/neutron-runtime-arm64.tar.gz"
+echo "Created Neutron ARM64 bootstrap (bash, coreutils, apt, dpkg, pkg, tar, gzip)"
+du -h "$ASSET_DIR/neutron-runtime-arm64.tar.gz" "$ASSET_DIR/neutron-bootstrap-arm64.tar.gz"
