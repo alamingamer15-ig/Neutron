@@ -82,11 +82,11 @@ jobs:
 
           require_apk_entry "lib/arm64-v8a/libc++_shared.so"
           require_apk_entry "lib/arm64-v8a/libldcustom.so"
-          require_apk_entry "assets/neutron-runtime-arm64.tar.gz"
+          require_apk_entry "assets/neutron-runtime-arm64.tar"
 
-          unzip -p "$APK" assets/neutron-runtime-arm64.tar.gz > "$RUNTIME_ARCHIVE"
+          unzip -p "$APK" assets/neutron-runtime-arm64.tar > "$RUNTIME_ARCHIVE"
           test -s "$RUNTIME_ARCHIVE"
-          tar -tzf "$RUNTIME_ARCHIVE" > "$RUNTIME_ENTRIES"
+          tar -tf "$RUNTIME_ARCHIVE" > "$RUNTIME_ENTRIES"
 
           require_runtime_entry() {
             local entry="$1"
