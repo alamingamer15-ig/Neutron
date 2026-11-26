@@ -4,7 +4,7 @@
 
 The project explores a Proton-inspired approach for Android: translate guest x86-64 code to native AArch64 code, provide a Linux userspace environment, and bridge guest application interfaces to Android's Linux kernel and graphics/audio/input systems.
 
-> **Status: early prototype.** The Android UI now has a persistent PTY-backed host shell and an offline installer for a pinned ARM64 glibc runtime plus Wayland/X11 runtime libraries and diagnostic tools. The x86-64 translator, Linux syscall compatibility layer, Android-backed desktop display server, and guest execution pipeline are not implemented yet.
+> **Status: early prototype.** The Android UI now has a persistent PTY-backed host shell and an offline installer for a pinned ARM64 glibc runtime plus Wayland/X11 runtime libraries. The x86-64 translator, Linux syscall compatibility layer, Android-backed desktop display server, and guest execution pipeline are not implemented yet.
 
 ## Project goals
 
@@ -36,7 +36,7 @@ The initial Android application uses Java, Android Views/XML, AndroidX AppCompat
 - Main sections: Home, Applications, Terminal, and Settings
 - The Applications screen can record selected file names locally. It does not yet validate, copy, load, or execute ELF binaries.
 - The Terminal screen runs Android's `/system/bin/sh` in a persistent PTY. It is a host shell, not the guest Linux shell.
-- Settings can install the pinned ARM64 glibc runtime and ARM64 Wayland/X11 libraries and diagnostic tools into Neutron's private prefix.
+- Settings can install the pinned ARM64 glibc runtime and ARM64 Wayland/X11 libraries into Neutron's private prefix.
 - The current graphics bundle contains client/server libraries and tools, not a compositor or X server connected to Android. Graphical Linux applications cannot display windows yet.
 - Runtime status and resource information are not connected to a native guest execution engine.
 
