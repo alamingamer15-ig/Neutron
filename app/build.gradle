@@ -8,6 +8,14 @@ android {
     compileSdk 35
     ndkVersion '27.2.12479018'
 
+    // The CI workflow generates the offline ARM64 runtime bundle before Gradle
+    // runs. Register that generated directory explicitly as an APK asset source.
+    sourceSets {
+        main {
+            assets.srcDir("$buildDir/generated/neutronAssets")
+        }
+    }
+
     defaultConfig {
         applicationId 'io.github.alamingamer15ig.neutron'
         minSdk 26
