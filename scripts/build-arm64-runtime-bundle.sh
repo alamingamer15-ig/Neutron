@@ -197,7 +197,7 @@ for binary in "$DEST"/usr/bin/* "$DEST"/usr/sbin/*; do
         [ -e "$DEST/neutron-bin/$command" ] && continue
         cat > "$DEST/neutron-bin/$command" <<EOF
 #!/system/bin/sh
-exec "\$PREFIX/bin/neutron-exec" "$command" "\$@"
+exec "\$PREFIX/neutron-bin/neutron-exec" "$command" "\$@"
 EOF
         chmod 0755 "$DEST/neutron-bin/$command"
     fi
@@ -212,7 +212,7 @@ for binary in "$DEST"/usr/lib/apt/methods/*; do
         command="${binary##*/}"
         cat > "$DEST/libexec/apt-methods/$command" <<EOF
 #!/system/bin/sh
-exec "\$PREFIX/bin/neutron-exec" "/usr/lib/apt/methods/$command" "\$@"
+exec "\$PREFIX/neutron-bin/neutron-exec" "/usr/lib/apt/methods/$command" "\$@"
 EOF
         chmod 0755 "$DEST/libexec/apt-methods/$command"
     fi
@@ -239,8 +239,8 @@ exec "$PREFIX/neutron-bin/neutron-exec" apt-get -o "Dir::Root=$PREFIX" \
     -o "Dir::Etc::parts=-" \
     -o "Dir::Bin::dpkg=$PREFIX/neutron-bin/dpkg" \
     -o "Dir::Bin::Methods=$PREFIX/libexec/apt-methods" \
-    -o "Dir::Bin::gpgv=$PREFIX/bin/gpgv" \
-    -o "Dir::Bin::apt-helper=$PREFIX/bin/apt-helper" "$@"
+    -o "Dir::Bin::gpgv=$PREFIX/neutron-bin/gpgv" \
+    -o "Dir::Bin::apt-helper=$PREFIX/neutron-bin/apt-helper" "$@"
 EOF
 cat > "$DEST/neutron-bin/apt" <<'EOF'
 #!/system/bin/sh
@@ -255,8 +255,8 @@ exec "$PREFIX/neutron-bin/neutron-exec" apt -o "Dir::Root=$PREFIX" \
     -o "Dir::Etc::parts=-" \
     -o "Dir::Bin::dpkg=$PREFIX/neutron-bin/dpkg" \
     -o "Dir::Bin::Methods=$PREFIX/libexec/apt-methods" \
-    -o "Dir::Bin::gpgv=$PREFIX/bin/gpgv" \
-    -o "Dir::Bin::apt-helper=$PREFIX/bin/apt-helper" "$@"
+    -o "Dir::Bin::gpgv=$PREFIX/neutron-bin/gpgv" \
+    -o "Dir::Bin::apt-helper=$PREFIX/neutron-bin/apt-helper" "$@"
 EOF
 cat > "$DEST/neutron-bin/apt-cache" <<'EOF'
 #!/system/bin/sh
@@ -270,8 +270,8 @@ exec "$PREFIX/neutron-bin/neutron-exec" apt-cache -o "Dir::Root=$PREFIX" \
     -o "Dir::Etc::sourceparts=-" \
     -o "Dir::Etc::parts=-" \
     -o "Dir::Bin::Methods=$PREFIX/libexec/apt-methods" \
-    -o "Dir::Bin::gpgv=$PREFIX/bin/gpgv" \
-    -o "Dir::Bin::apt-helper=$PREFIX/bin/apt-helper" "$@"
+    -o "Dir::Bin::gpgv=$PREFIX/neutron-bin/gpgv" \
+    -o "Dir::Bin::apt-helper=$PREFIX/neutron-bin/apt-helper" "$@"
 EOF
 cat > "$DEST/neutron-bin/dpkg" <<'EOF'
 #!/system/bin/sh
@@ -290,7 +290,7 @@ case "$command" in
     remove|uninstall) exec "$PREFIX/neutron-bin/apt-get" remove "$@" ;;
     search) exec "$PREFIX/neutron-bin/apt-cache" search "$@" ;;
     show) exec "$PREFIX/neutron-bin/apt-cache" show "$@" ;;
-    list) exec "$PREFIX/bin/apt" list "$@" ;;
+    list) exec "$PREFIX/neutron-bin/apt" list "$@" ;;
     help|-h|--help)
         echo "Neutron pkg: update | upgrade | install PKG... | remove PKG... | search TERM | show PKG | list"
         ;;
