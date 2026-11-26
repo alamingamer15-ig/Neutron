@@ -36,6 +36,9 @@ jobs:
           sh scripts/install-android-glibc.sh apk app/src/main/jniLibs/arm64-v8a
           readelf -h app/src/main/jniLibs/arm64-v8a/libldcustom.so | grep 'Machine:.*AArch64'
 
+      - name: Build offline ARM64 glibc, Wayland and X11 runtime bundle
+        run: sh scripts/build-arm64-runtime-bundle.sh
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -55,8 +58,47 @@ jobs:
 
       - name: Verify Android-compatible glibc loader and shared C++ runtime are packaged
         run: |
-          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/arm64-v8a/libc\+\+_shared\.so$'
-          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/arm64-v8a/libldcustom\.so$'
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/arm64-v8a/libc\+\+_shared\.so
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: neutron-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/arm64-v8a/libldcustom\.so
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: neutron-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'assets/neutron-runtime-arm64\.tar\.gz
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: neutron-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+          unzip -p app/build/outputs/apk/debug/app-debug.apk assets/neutron-runtime-arm64.tar.gz > /tmp/neutron-runtime-arm64.tar.gz
+          tar -tzf /tmp/neutron-runtime-arm64.tar.gz | grep -E '^usr/lib/aarch64-linux-gnu/libwayland-client\.so\.0
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: neutron-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+          tar -tzf /tmp/neutron-runtime-arm64.tar.gz | grep -E '^usr/lib/aarch64-linux-gnu/libX11\.so\.6
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: neutron-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
