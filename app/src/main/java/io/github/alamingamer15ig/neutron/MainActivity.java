@@ -2,9 +2,7 @@ package io.github.alamingamer15ig.neutron;
 
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.ContentResolver;
 import android.database.Cursor;
-import android.provider.DocumentsContract;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
@@ -24,7 +22,6 @@ import android.text.InputType;
 import android.widget.TextView;
 import android.widget.Toast;
 import java.io.File;
-import java.io.InputStream;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
@@ -45,14 +42,8 @@ import java.util.Set;
 
 public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_PICK_ELF = 41;
-    private static final int REQUEST_PICK_ROOTFS = 42;
-    private static final int REQUEST_PICK_TERMINAL_ELF = 43;
     private static final String PREFS = "neutron_ui";
     private static final String PREF_SELECTED_FILES = "selected_files";
-    private static final String PREF_ROOTFS_URI = "rootfs_tree_uri";
-    private static final String PREF_TERMINAL_ELF_URI = "terminal_elf_uri";
-    private static final String PREF_TERMINAL_ELF_NAME = "terminal_elf_name";
-    private static final String PREF_ROOTFS_RETURN_TERMINAL = "rootfs_return_terminal";
     private static final String PREF_GUEST_RAM_MB = "guest_ram_limit_mb";
     private static final String PREF_GUEST_CORE_COUNT = "guest_core_count";
     private static final int DEFAULT_GUEST_RAM_MB = 512;
@@ -720,286 +711,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    private void addRootfsCard(LinearLayout parent) {
-        LinearLayout body = new LinearLayout(this);
-        body.setOrientation(LinearLayout.VERTICAL);
-        body.setPadding(dp(16), dp(15), dp(16), dp(15));
-        body.addView(text("LINUX ENVIRONMENT", 10, R.color.neutron_primary, true));
-
-        TextView heading = text("Root filesystem", 16, R.color.neutron_text, true);
-        LinearLayout.LayoutParams headingParams = params(-1, -2);
-        headingParams.topMargin = dp(6);
-        body.addView(heading, headingParams);
-
-        TextView status = text(getRootfsStatus(), 12,
-                isRootfsValid() ? R.color.neutron_primary : R.color.neutron_muted, false);
-        LinearLayout.LayoutParams statusParams = params(-1, -2);
-        statusParams.topMargin = dp(5);
-        body.addView(status, statusParams);
-
-        MaterialButton installDefault = button(RootfsInstaller.isInstalled(this)
-                ? "Reinstall ARM64 rootfs" : "Install default ARM64 glibc rootfs");
-        installDefault.setOnClickListener(v -> installDefaultRootfs(
-                status, installDefault, false, RootfsInstaller.isInstalled(this)));
-        LinearLayout.LayoutParams installParams = params(-1, -2);
-        installParams.topMargin = dp(12);
-        body.addView(installDefault, installParams);
-
-        MaterialButton chooseRootfs = button("Validate external rootfs folder");
-        chooseRootfs.setOnClickListener(v -> chooseRootfsFolder());
-        LinearLayout.LayoutParams buttonParams = params(-1, -2);
-        buttonParams.topMargin = dp(8);
-        body.addView(chooseRootfs, buttonParams);
-
-        MaterialCardView rootfsCard = card();
-        rootfsCard.addView(body);
-        LinearLayout.LayoutParams cardParams = params(-1, -2);
-        cardParams.topMargin = dp(18);
-        parent.addView(rootfsCard, cardParams);
-    }
-
-    private void installDefaultRootfs(TextView status, MaterialButton installButton, boolean returnToTerminal) {
-        installDefaultRootfs(status, installButton, returnToTerminal, false);
-    }
-
-    private void installDefaultRootfs(TextView status, MaterialButton installButton,
-                                      boolean returnToTerminal, boolean forceReinstall) {
-        installButton.setEnabled(false);
-        status.setText("Downloading Neutron ARM64 glibc rootfs…");
-        new Thread(() -> {
-            try {
-                File installed = RootfsInstaller.install(this, percent ->
-                        runOnUiThread(() -> status.setText(
-                                percent < 0 ? "Extracting ARM64 glibc rootfs…" :
-                                        "Downloading ARM64 glibc rootfs… " + percent + "%")),
-                        forceReinstall);
-                runOnUiThread(() -> {
-                    status.setText("Neutron minimal glibc · ARM64 · installed in app storage");
-                    installButton.setText("Reinstall ARM64 rootfs");
-                    installButton.setEnabled(true);
-                    Toast.makeText(this, "Neutron glibc rootfs installed.", Toast.LENGTH_LONG).show();
-                    showScreen(returnToTerminal ? R.id.nav_terminal : R.id.nav_apps);
-                });
-            } catch (Exception error) {
-                runOnUiThread(() -> {
-                    status.setText("Installation failed: " + error.getMessage());
-                    installButton.setEnabled(true);
-                    Toast.makeText(this, "Rootfs installation failed.", Toast.LENGTH_LONG).show();
-                });
-            }
-        }, "neutron-rootfs-installer").start();
-    }
-
-    private void chooseRootfsFolder() {
-        chooseRootfsFolder(false);
-    }
-
-    private void chooseRootfsFolder(boolean returnToTerminal) {
-        getPreferences().edit().putBoolean(PREF_ROOTFS_RETURN_TERMINAL, returnToTerminal).apply();
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
-                | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
-                | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
-        startActivityForResult(intent, REQUEST_PICK_ROOTFS);
-    }
-
-    private boolean isRootfsValid() {
-        if (RootfsInstaller.isInstalled(this)) {
-            return true;
-        }
-        Uri treeUri = getSavedRootfsUri();
-        if (treeUri == null) {
-            return false;
-        }
-
-        Set<String> missing = new HashSet<>();
-        Collections.addAll(missing, "bin", "lib", "home", "dev", "proc");
-
-        try {
-            ContentResolver resolver = getContentResolver();
-            String rootDocumentId = DocumentsContract.getTreeDocumentId(treeUri);
-            Uri rootDocumentUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, rootDocumentId);
-            String[] rootProjection = {DocumentsContract.Document.COLUMN_MIME_TYPE};
-            try (Cursor rootCursor = resolver.query(rootDocumentUri, rootProjection,
-                    null, null, null)) {
-                if (rootCursor == null || !rootCursor.moveToFirst()) {
-                    return false;
-                }
-                int mimeColumn = rootCursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE);
-                if (mimeColumn < 0 || !DocumentsContract.Document.MIME_TYPE_DIR.equals(
-                        rootCursor.getString(mimeColumn))) {
-                    return false;
-                }
-            }
-
-            Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, rootDocumentId);
-            String[] childProjection = {
-                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-                    DocumentsContract.Document.COLUMN_MIME_TYPE
-            };
-            try (Cursor children = resolver.query(childrenUri, childProjection,
-                    null, null, null)) {
-                if (children == null) {
-                    return false;
-                }
-                int nameColumn = children.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME);
-                int typeColumn = children.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE);
-                if (nameColumn < 0 || typeColumn < 0) {
-                    return false;
-                }
-                while (children.moveToNext()) {
-                    String name = children.getString(nameColumn);
-                    String mime = children.getString(typeColumn);
-                    if (name != null && DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)) {
-                        missing.remove(name);
-                    }
-                }
-            }
-            if (!missing.isEmpty()) return false;
-            Uri busybox = findChildDocumentUri(treeUri, rootDocumentId, "bin", "busybox");
-            Uri loader = findChildDocumentUri(treeUri, rootDocumentId, "lib", "ld-linux-aarch64.so.1");
-            if (loader == null) {
-                loader = findChildDocumentUri(treeUri, rootDocumentId, "lib64", "ld-linux-aarch64.so.1");
-            }
-            return busybox != null && loader != null
-                    && isArm64ElfUri(busybox) && isArm64ElfUri(loader);
-        } catch (Exception ignored) {
-            return false;
-        }
-    }
-
-    private Uri findChildDocumentUri(Uri treeUri, String parentId, String directory, String fileName) {
-        try {
-            Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId);
-            String directoryId = null;
-            try (Cursor cursor = getContentResolver().query(children,
-                    new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-                            DocumentsContract.Document.COLUMN_MIME_TYPE}, null, null, null)) {
-                if (cursor == null) return null;
-                while (cursor.moveToNext()) {
-                    if (directory.equals(cursor.getString(1))
-                            && DocumentsContract.Document.MIME_TYPE_DIR.equals(cursor.getString(2))) {
-                        directoryId = cursor.getString(0);
-                        break;
-                    }
-                }
-            }
-            if (directoryId == null) return null;
-            Uri nested = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, directoryId);
-            try (Cursor cursor = getContentResolver().query(nested,
-                    new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                            DocumentsContract.Document.COLUMN_DISPLAY_NAME}, null, null, null)) {
-                if (cursor == null) return null;
-                while (cursor.moveToNext()) {
-                    if (fileName.equals(cursor.getString(1))) {
-                        return DocumentsContract.buildDocumentUriUsingTree(treeUri, cursor.getString(0));
-                    }
-                }
-            }
-        } catch (Exception ignored) {
-            return null;
-        }
-        return null;
-    }
-
-    private boolean isArm64ElfUri(Uri uri) {
-        try (InputStream input = "file".equals(uri.getScheme())
-                ? new java.io.FileInputStream(uri.getPath())
-                : getContentResolver().openInputStream(uri)) {
-            if (input == null) return false;
-            byte[] header = new byte[20];
-            int offset = 0;
-            while (offset < header.length) {
-                int count = input.read(header, offset, header.length - offset);
-                if (count < 0) return false;
-                offset += count;
-            }
-            int type = (header[16] & 0xff) | ((header[17] & 0xff) << 8);
-            int machine = (header[18] & 0xff) | ((header[19] & 0xff) << 8);
-            return header[0] == 0x7f && header[1] == 'E' && header[2] == 'L'
-                    && header[3] == 'F' && header[4] == 2 && header[5] == 1
-                    && (type == 2 || type == 3) && machine == 183;
-        } catch (Exception ignored) {
-            return false;
-        }
-    }
-
-    private String getRootfsStatus() {
-        if (RootfsInstaller.isInstalled(this)) {
-            return "Neutron minimal glibc · ARM64 · app-private storage";
-        }
-        if (getSavedRootfsUri() == null) {
-            return "No rootfs selected. Launch is disabled.";
-        }
-        if (isRootfsValid()) {
-            return "External rootfs validated, but SAF folders are not executable here. Install the built-in rootfs to run commands.";
-        }
-        return "Invalid or inaccessible rootfs. It must contain /bin, /lib, /home, /dev, /proc and the AArch64 glibc loader.";
-    }
-
-    @Nullable
-    private Uri getSavedRootfsUri() {
-        String value = getPreferences().getString(PREF_ROOTFS_URI, null);
-        return value == null ? null : Uri.parse(value);
-    }
-
-    private void chooseTerminalElf() {
-        if (RootfsInstaller.isInstalled(this)) {
-            File busybox = new File(RootfsInstaller.getRootfsDirectory(this), "bin/busybox");
-            Uri uri = Uri.fromFile(busybox);
-            if (isArm64TerminalElf(uri, "busybox")) {
-                new AlertDialog.Builder(this)
-                        .setTitle("Choose terminal binary")
-                        .setItems(new String[]{"/bin/busybox (shell applet)"}, (dialog, which) ->
-                                saveTerminalElf(uri, "/bin/busybox"))
-                        .setNegativeButton("Cancel", null)
-                        .show();
-                return;
-            }
-        }
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("*/*");
-        startActivityForResult(intent, REQUEST_PICK_TERMINAL_ELF);
-    }
-
-    private void saveTerminalElf(Uri uri, String name) {
-        getPreferences().edit()
-                .putString(PREF_TERMINAL_ELF_URI, uri.toString())
-                .putString(PREF_TERMINAL_ELF_NAME, name)
-                .apply();
-        Toast.makeText(this, "ARM64 terminal ELF accepted.", Toast.LENGTH_SHORT).show();
-        showScreen(R.id.nav_terminal);
-    }
-
-    private boolean isArm64TerminalElf(Uri uri, String name) {
-        String lower = name == null ? "" : name.toLowerCase(java.util.Locale.ROOT);
-        boolean shellName = lower.equals("sh") || lower.equals("ash") || lower.equals("bash")
-                || lower.equals("busybox") || lower.equals("dash") || lower.equals("zsh");
-        if (!shellName) return false;
-        try (InputStream input = "file".equals(uri.getScheme())
-                ? new java.io.FileInputStream(uri.getPath())
-                : getContentResolver().openInputStream(uri)) {
-            if (input == null) return false;
-            byte[] header = new byte[20];
-            int offset = 0;
-            while (offset < header.length) {
-                int count = input.read(header, offset, header.length - offset);
-                if (count < 0) return false;
-                offset += count;
-            }
-            if (header[0] != 0x7f || header[1] != 'E' || header[2] != 'L' || header[3] != 'F') return false;
-            if (header[4] != 2 || header[5] != 1) return false;
-            int type = (header[16] & 0xff) | ((header[17] & 0xff) << 8);
-            int machine = (header[18] & 0xff) | ((header[19] & 0xff) << 8);
-            return (type == 2 || type == 3) && machine == 183;
-        } catch (Exception ignored) {
-            return false;
-        }
-    }
-
     private void chooseElfFile() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -1010,59 +721,12 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if ((requestCode != REQUEST_PICK_ELF && requestCode != REQUEST_PICK_ROOTFS && requestCode != REQUEST_PICK_TERMINAL_ELF)
-                || resultCode != RESULT_OK || data == null) {
+        if (requestCode != REQUEST_PICK_ELF || resultCode != RESULT_OK || data == null) {
             return;
         }
 
         Uri uri = data.getData();
         if (uri == null) {
-            return;
-        }
-
-        if (requestCode == REQUEST_PICK_ROOTFS) {
-            int flags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-            try {
-                getContentResolver().takePersistableUriPermission(uri, flags);
-                getPreferences().edit()
-                        .putString(PREF_ROOTFS_URI, uri.toString())
-                        .remove(PREF_TERMINAL_ELF_URI)
-                        .remove(PREF_TERMINAL_ELF_NAME)
-                        .apply();
-                if (isRootfsValid()) {
-                    Toast.makeText(this, "Rootfs validated.", Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(this,
-                            "Rootfs is missing one or more required directories.",
-                            Toast.LENGTH_LONG).show();
-                }
-            } catch (Exception error) {
-                Toast.makeText(this, "Could not save access to this folder.", Toast.LENGTH_LONG).show();
-            }
-            boolean returnToTerminal = getPreferences().getBoolean(PREF_ROOTFS_RETURN_TERMINAL, false);
-            getPreferences().edit().remove(PREF_ROOTFS_RETURN_TERMINAL).apply();
-            showScreen(returnToTerminal ? R.id.nav_terminal : R.id.nav_apps);
-            return;
-        }
-
-        if (requestCode == REQUEST_PICK_TERMINAL_ELF) {
-            String name = queryDisplayName(uri);
-            if (!isArm64TerminalElf(uri, name)) {
-                Toast.makeText(this,
-                        "Rejected: choose an ELF64 little-endian AArch64 shell named sh, ash, bash, BusyBox, dash or zsh.",
-                        Toast.LENGTH_LONG).show();
-                showScreen(R.id.nav_terminal);
-                return;
-            }
-            int flags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-            try {
-                getContentResolver().takePersistableUriPermission(uri, flags);
-            } catch (Exception ignored) {
-                // Some document providers grant temporary access only.
-            }
-            saveTerminalElf(uri, name);
             return;
         }
 
