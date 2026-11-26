@@ -230,7 +230,7 @@ public final class RootfsInstaller {
     }
 
     private static boolean isAarch64Elf(File file) {
-        if (!file.isFile()) return false;
+        if (file == null || !file.isFile()) return false;
         try (InputStream input = new FileInputStream(file)) {
             byte[] header = new byte[20];
             int offset = 0;
