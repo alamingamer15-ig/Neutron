@@ -69,7 +69,7 @@ public class MainActivity extends AppCompatActivity {
         if (NeutronLog.init(getApplicationContext())) {
             NeutronLog.info("MainActivity", "Neutron application started");
         }
-        setContentView(R.layout.activity_main);
+        NeutronEnvironment.initialize(this);\n        setContentView(R.layout.activity_main);
 
         toolbar = findViewById(R.id.toolbar);
         contentContainer = findViewById(R.id.content_container);
@@ -337,84 +337,75 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private ScrollView buildTerminalScreen() {
-        File rootfs = RootfsInstaller.getRootfsDirectory(this);
-        File busybox = new File(rootfs, "bin/busybox");
-        File loader = new File(rootfs, "lib64/ld-linux-aarch64.so.1");
-        if (!loader.isFile()) {
-            loader = new File(rootfs, "lib/ld-linux-aarch64.so.1");
-        }
-        final File loaderFile = loader;
-        boolean shellReady = RootfsInstaller.isInstalled(this)
-                && busybox.isFile() && loader.isFile();
+        NeutronEnvironment environment = NeutronEnvironment.initialize(this);
         ScrollView page = createPage();
         LinearLayout content = pageContent(page);
-        content.addView(text("Linux terminal", 25, R.color.neutron_text, true));
-        TextView subtitle = text("Run BusyBox from Neutron’s built-in app-private ARM64 rootfs.", 14,
+
+        content.addView(text("Neutron terminal", 25, R.color.neutron_text, true));
+        TextView subtitle = text("A Termux-inspired userspace layout, managed inside Neutron.", 14,
                 R.color.neutron_muted, false);
         LinearLayout.LayoutParams subtitleParams = params(-1, -2);
         subtitleParams.topMargin = dp(6);
         content.addView(subtitle, subtitleParams);
 
-        MaterialCardView rootfsCard = card();
-        LinearLayout rootfsBody = new LinearLayout(this);
-        rootfsBody.setOrientation(LinearLayout.VERTICAL);
-        rootfsBody.setPadding(dp(16), dp(15), dp(16), dp(15));
-        rootfsBody.addView(text("ROOT FILESYSTEM", 10, R.color.neutron_primary, true));
-        TextView rootfsStatus = text(getRootfsStatus(), 12,
-                isRootfsValid() ? R.color.neutron_primary : R.color.neutron_muted, false);
-        LinearLayout.LayoutParams rootfsStatusParams = params(-1, -2);
-        rootfsStatusParams.topMargin = dp(6);
-        rootfsBody.addView(rootfsStatus, rootfsStatusParams);
+        MaterialCardView environmentCard = card();
+        LinearLayout environmentBody = new LinearLayout(this);
+        environmentBody.setOrientation(LinearLayout.VERTICAL);
+        environmentBody.setPadding(dp(16), dp(15), dp(16), dp(15));
+        environmentBody.addView(text("NEUTRON PREFIX", 10, R.color.neutron_primary, true));
+        TextView path = text(environment.getRootDirectory().getAbsolutePath(), 12,
+                R.color.neutron_text, false);
+        path.setTypeface(Typeface.MONOSPACE);
+        LinearLayout.LayoutParams pathParams = params(-1, -2);
+        pathParams.topMargin = dp(7);
+        environmentBody.addView(path, pathParams);
 
-        MaterialButton chooseRootfs = button("Validate external rootfs folder");
-        chooseRootfs.setOnClickListener(v -> chooseRootfsFolder(true));
-        LinearLayout.LayoutParams chooseRootfsParams = params(-1, -2);
-        chooseRootfsParams.topMargin = dp(12);
-        rootfsBody.addView(chooseRootfs, chooseRootfsParams);
+        TextView layout = text("bin/   lib/   lib64/   home/", 12,
+                R.color.neutron_muted, false);
+        layout.setTypeface(Typeface.MONOSPACE);
+        LinearLayout.LayoutParams layoutParams = params(-1, -2);
+        layoutParams.topMargin = dp(10);
+        environmentBody.addView(layout, layoutParams);
 
-        MaterialButton defaultRootfs = button("Use default ARM64 rootfs");
-        defaultRootfs.setOnClickListener(v -> installDefaultRootfs(rootfsStatus, defaultRootfs, true));
-        LinearLayout.LayoutParams defaultRootfsParams = params(-1, -2);
-        defaultRootfsParams.topMargin = dp(8);
-        rootfsBody.addView(defaultRootfs, defaultRootfsParams);
-        rootfsCard.addView(rootfsBody);
-        LinearLayout.LayoutParams rootfsCardParams = params(-1, -2);
-        rootfsCardParams.topMargin = dp(18);
-        content.addView(rootfsCard, rootfsCardParams);
-
+        TextView status = text(environment.isReady()
+                        ? "Environment directories initialized."
+                        : "Environment initialization failed.",
+                12, environment.isReady() ? R.color.neutron_primary : R.color.neutron_muted, false);
+        LinearLayout.LayoutParams statusParams = params(-1, -2);
+        statusParams.topMargin = dp(8);
+        environmentBody.addView(status, statusParams);
+        environmentCard.addView(environmentBody);
+        LinearLayout.LayoutParams environmentCardParams = params(-1, -2);
+        environmentCardParams.topMargin = dp(18);
+        content.addView(environmentCard, environmentCardParams);
 
         MaterialCardView terminalCard = card();
         terminalCard.setCardBackgroundColor(0xFF0B1018);
         LinearLayout terminal = new LinearLayout(this);
         terminal.setOrientation(LinearLayout.VERTICAL);
         terminal.setPadding(dp(16), dp(18), dp(16), dp(18));
-        terminal.addView(text("NEUTRON / BUSYBOX (ARM64)", 10, R.color.neutron_primary, true));
+        terminal.addView(text("NEUTRON / HOST SHELL", 10, R.color.neutron_primary, true));
 
-        MaterialButton diagnosticsButton = button("Run execution diagnostics");
-        LinearLayout.LayoutParams diagnosticsParams = params(-1, -2);
-        diagnosticsParams.topMargin = dp(12);
-        terminal.addView(diagnosticsButton, diagnosticsParams);
-
-        TextView transcript = text(shellReady
-                        ? "BusyBox shell session · commands run in the selected rootfs\n"
-                        : "Rootfs unavailable. Install it above to start BusyBox.\n",
+        TextView transcript = text(environment.isReady()
+                        ? "Neutron bootstrap shell · working directory: home/\n"
+                        : "Cannot initialize Neutron environment.\n",
                 13, R.color.neutron_text, false);
         transcript.setTypeface(Typeface.MONOSPACE);
         transcript.setLineSpacing(dp(5), 1.0f);
         transcript.setTextIsSelectable(true);
         LinearLayout.LayoutParams transcriptParams = params(-1, -2);
-        transcriptParams.topMargin = dp(18);
+        transcriptParams.topMargin = dp(16);
         terminal.addView(transcript, transcriptParams);
 
         EditText command = new EditText(this);
         command.setSingleLine(true);
         command.setTextSize(13);
         command.setTypeface(Typeface.MONOSPACE);
-        command.setHint("Type a BusyBox command");
+        command.setHint("Enter a shell command");
         command.setInputType(InputType.TYPE_CLASS_TEXT
                 | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         command.setImeOptions(EditorInfo.IME_ACTION_DONE);
-        command.setEnabled(shellReady);
+        command.setEnabled(environment.isReady());
         command.setFocusableInTouchMode(true);
         command.setOnClickListener(v -> showTerminalKeyboard(command));
         command.setOnFocusChangeListener((v, hasFocus) -> {
@@ -425,38 +416,15 @@ public class MainActivity extends AppCompatActivity {
         terminal.addView(command, commandParams);
 
         MaterialButton execute = button("Run command");
-        execute.setEnabled(shellReady);
-        execute.setAlpha(shellReady ? 1.0f : 0.45f);
+        execute.setEnabled(environment.isReady());
+        execute.setAlpha(environment.isReady() ? 1.0f : 0.45f);
         LinearLayout.LayoutParams executeParams = params(-1, -2);
         executeParams.topMargin = dp(8);
         terminal.addView(execute, executeParams);
 
-        diagnosticsButton.setOnClickListener(v -> {
-            diagnosticsButton.setEnabled(false);
-            transcript.append("\n$ Neutron platform diagnostics\n");
-            new Thread(() -> {
-                final String result;
-                try {
-                    result = NeutronTerminal.runPlatformDiagnostics(getFilesDir().getAbsolutePath());
-                } catch (Throwable error) {
-                    runOnUiThread(() -> {
-                        transcript.append("Diagnostics bridge failed: "
-                                + error.getClass().getSimpleName()
-                                + ": " + String.valueOf(error.getMessage()) + "\n");
-                        diagnosticsButton.setEnabled(true);
-                    });
-                    return;
-                }
-                runOnUiThread(() -> {
-                    transcript.append(result);
-                    diagnosticsButton.setEnabled(true);
-                });
-            }, "neutron-platform-diagnostics").start();
-        });
-
         Runnable runCommand = () -> {
             String entered = command.getText().toString().trim();
-            if (entered.isEmpty() || !shellReady) return;
+            if (entered.isEmpty() || !environment.isReady()) return;
             command.setText("");
             InputMethodManager imm = (InputMethodManager) getSystemService(
                     Context.INPUT_METHOD_SERVICE);
@@ -464,27 +432,12 @@ public class MainActivity extends AppCompatActivity {
             execute.setEnabled(false);
             transcript.append("\n$ " + entered + "\n");
             new Thread(() -> {
-                final String result;
-                try {
-                    result = NeutronTerminal.runCommand(
-                            loaderFile.getAbsolutePath(),
-                            busybox.getAbsolutePath(),
-                            rootfs.getAbsolutePath(),
-                            entered);
-                } catch (RuntimeException error) {
-                    runOnUiThread(() -> {
-                        transcript.append("Neutron: "
-                                + error.getClass().getSimpleName()
-                                + ": " + String.valueOf(error.getMessage()) + "\n");
-                        execute.setEnabled(true);
-                    });
-                    return;
-                }
+                final String result = NeutronEnvironment.runHostCommand(environment, entered);
                 runOnUiThread(() -> {
-                    if (!result.isEmpty()) transcript.append(result);
+                    transcript.append(result);
                     execute.setEnabled(true);
                 });
-            }, "neutron-busybox-command").start();
+            }, "neutron-shell-command").start();
         };
         execute.setOnClickListener(v -> runCommand.run());
         command.setOnEditorActionListener((view, actionId, event) -> {
@@ -497,9 +450,8 @@ public class MainActivity extends AppCompatActivity {
             return false;
         });
 
-        TextView backendInfo = text(shellReady
-                        ? "Commands execute through the rootfs glibc loader and BusyBox. Each command currently starts a fresh shell; interactive programs and persistent shell state need a PTY backend."
-                        : "BusyBox command input becomes available after installing the built-in ARM64 rootfs.",
+        TextView backendInfo = text(
+                "This first stage uses Android's /system/bin/sh. The Neutron bin/ directory is on PATH, but glibc, Bash and Linux packages are not installed yet.",
                 12, R.color.neutron_muted, false);
         LinearLayout.LayoutParams backendInfoParams = params(-1, -2);
         backendInfoParams.topMargin = dp(12);
