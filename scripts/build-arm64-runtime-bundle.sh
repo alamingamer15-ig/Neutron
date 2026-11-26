@@ -29,7 +29,17 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 EOF
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends dpkg-dev binutils
-sudo apt-get install -y --download-only --no-install-recommends \
+# Resolve packages against an empty ARM64 dpkg database. The CI host is
+# amd64 and already has amd64 versions of these tools installed; using its
+# normal status file makes dpkg's Multi-Arch: same rules reject arm64 packages.
+: > "$STAGE/empty-dpkg-status"
+cat > "$STAGE/apt-arm64.conf" <<EOF
+APT::Architecture "arm64";
+APT::Architectures { "arm64"; };
+Dir::State::status "$STAGE/empty-dpkg-status";
+Dir::Cache::archives "/var/cache/apt/archives";
+EOF
+sudo env APT_CONFIG="$STAGE/apt-arm64.conf" apt-get install -y --download-only --no-install-recommends \
     bash:arm64 dash:arm64 coreutils:arm64 tar:arm64 gzip:arm64 xz-utils:arm64 \
     findutils:arm64 grep:arm64 sed:arm64 gawk:arm64 \
     dpkg:arm64 apt:arm64 ca-certificates:arm64 curl:arm64 wget:arm64 ubuntu-keyring:arm64 \
