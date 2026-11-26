@@ -32,7 +32,7 @@ jobs:
       - name: Fetch pinned Android-compatible glibc loader
         run: |
           sudo apt-get update
-          sudo apt-get install -y curl git binutils
+          sudo apt-get install -y curl git binutils zip unzip
           sh scripts/install-android-glibc.sh apk app/src/main/jniLibs/arm64-v8a
           readelf -h app/src/main/jniLibs/arm64-v8a/libldcustom.so | grep 'Machine:.*AArch64'
 
