@@ -177,15 +177,20 @@ exit 0
 EOF
 chmod 0755 "$DEST/bin/ldconfig"
 
-for command in bash apt apt-get dpkg ls cat cp mv rm mkdir rmdir chmod chown ln readlink \
-    pwd env printenv uname id whoami date sleep touch mkdir find xargs grep sed awk \
-    tar gzip xz curl wget; do
-    [ -e "$DEST/usr/bin/$command" ] || [ -L "$DEST/usr/bin/$command" ] || continue
-    cat > "$DEST/bin/$command" <<EOF
+# Create Android-shell launch wrappers for every bundled ARM64 ELF command.
+# Direct execution would fail because Ubuntu's PT_INTERP path is not present
+# on Android; neutron-exec supplies Neutron's patched loader.
+for binary in "$DEST"/usr/bin/* "$DEST"/usr/sbin/*; do
+    [ -e "$binary" ] || continue
+    if readelf -h "$binary" 2>/dev/null | grep -q 'Machine:.*AArch64'; then
+        command="${binary##*/}"
+        [ -e "$DEST/bin/$command" ] && continue
+        cat > "$DEST/bin/$command" <<EOF
 #!/system/bin/sh
 exec "\$PREFIX/bin/neutron-exec" "$command" "\$@"
 EOF
-    chmod 0755 "$DEST/bin/$command"
+        chmod 0755 "$DEST/bin/$command"
+    fi
 done
 
 # apt/dpkg must operate inside Neutron's private prefix, never Android's root.
