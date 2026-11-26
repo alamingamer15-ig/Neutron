@@ -36,10 +36,7 @@ jobs:
           sh scripts/install-android-glibc.sh apk app/src/main/jniLibs/arm64-v8a
           readelf -h app/src/main/jniLibs/arm64-v8a/libldcustom.so | grep 'Machine:.*AArch64'
 
-      - name: Build offline ARM64 glibc, Wayland and X11 runtime bundle
-        run: sh scripts/build-arm64-runtime-bundle.sh
-
-      - name: Build Neutron ARM64 bootstrap
+      - name: Build Neutron ARM64 runtime and bootstrap bundles
         run: sh scripts/build-arm64-runtime-bundle.sh
 
       - name: Set up Gradle
@@ -99,10 +96,6 @@ jobs:
             fi
             echo "Verified bootstrap entry: $entry"
           done
-
-          unzip -p "$APK" assets/neutron-runtime-arm64.tar > "$RUNTIME_ARCHIVE"
-          test -s "$RUNTIME_ARCHIVE"
-          tar -tf "$RUNTIME_ARCHIVE" > "$RUNTIME_ENTRIES"
 
           unzip -p "$APK" assets/neutron-runtime-arm64.tar > "$RUNTIME_ARCHIVE"
           test -s "$RUNTIME_ARCHIVE"
