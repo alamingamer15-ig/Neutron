@@ -113,31 +113,26 @@ Guest x86-64 syscall ABI
         -> translated result and guest-visible error
 ```
 
-The rootfs provides userspace libraries and compatibility services where needed; it cannot replace or modify Android's kernel syscall implementation.
+Neutron's private prefix provides userspace libraries and compatibility services where needed; it cannot replace or modify Android's kernel syscall implementation.
 
 Compatibility is progressive. Unsupported or unsafe operations must fail clearly rather than being silently misrepresented. Signals, sockets, polling, clocks, futex-like synchronization, memory management, and file operations need dedicated compatibility tests.
 
-## 6. Root filesystem and packages
+## 6. Neutron prefix and packages
 
-- Neutron-managed lightweight Linux userspace.
-- `apk` is the planned package manager; external repositories are intended.
-- The default rootfs contains ARM64 glibc and native ARM64 utilities; its shell runs natively on the host.
-- The current bootstrap is a prefix-based runtime bundle rather than a full distro rootfs. It installs the pinned Android-compatible ARM64 glibc loader/libraries and a pre-resolved set of Ubuntu 24.04 ARM64 Wayland/X11 runtime packages under the Neutron prefix. The package list records exact package versions; the package manager is still a separate planned stage.
+- Neutron owns a lightweight, app-private prefix with `bin/`, `lib/`, `lib64/`, and `home/` directories.
+- The initial shell and terminal run in this prefix without installing a separate rootfs archive or requiring the Termux app.
+- The offline runtime bundle installs the pinned Android-compatible ARM64 glibc loader/libraries and a pre-resolved set of Ubuntu 24.04 ARM64 Wayland/X11 runtime packages under the prefix.
+- The package list records exact package versions. A Neutron-compatible package manager is planned, with a Termux-style `pkg` frontend and package tooling for the glibc environment.
+- Termux's reusable terminal-view and terminal-emulator libraries provide the terminal UI and PTY emulator; Neutron supplies its own prefix, shell environment, and future execution engine.
 - The initial graphics bundle includes Wayland client/server libraries and X11 client libraries. It does not include an Android-connected Wayland compositor or X server, so installing these libraries alone does not make desktop windows appear.
-- Selected x86-64 application ELFs and their x86-64 libraries use the x86-64 guest ABI and DBT. Do not mix x86-64 guest libraries into the ARM64 base rootfs.
+- Selected x86-64 application ELFs and their x86-64 libraries use the x86-64 guest ABI and DBT. Do not mix x86-64 guest libraries into the ARM64 base prefix.
 - Guest libc and dynamic-linker strategy remains an explicit design decision. Generic Linux ELF compatibility must not be confused with universal compatibility across glibc- and musl-based environments.
-- Writable rootfs with protected system directories.
-- Rootfs reset and recovery support.
-- Virtual `/dev` rather than unrestricted access to Android device nodes.
-- Environment variables and shell profiles.
-- Rootfs updates are independent from Neutron engine updates.
+- The prefix is disk-backed in app-private storage. Files are loaded through normal filesystem and page-cache behavior as needed; the entire userspace is not intended to be permanently resident in RAM.
 - Package installation requires explicit user confirmation.
-
-The rootfs is disk-backed in app-private storage. Files are loaded through normal filesystem and page-cache behavior as needed; the entire rootfs is not intended to be permanently resident in RAM.
 
 ## 7. Filesystem and Android storage
 
-- One shared guest filesystem and one shared rootfs.
+- One shared guest filesystem rooted at Neutron's private prefix.
 - App-private storage is the default boundary.
 - Android shared folders are exposed only through explicit user selection.
 - User-selected files and folders may be mapped into guest paths using Android-granted access.
