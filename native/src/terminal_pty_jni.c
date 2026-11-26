@@ -87,9 +87,12 @@ Java_io_github_alamingamer15ig_neutron_NeutronPty_nativeStart(
 
         if (chdir(home) != 0) _exit(126);
         char path_value[PATH_MAX];
+        char glibc_prefix[PATH_MAX];
         (void) snprintf(path_value, sizeof(path_value), "%s:/system/bin:/system/xbin", bin);
+        (void) snprintf(glibc_prefix, sizeof(glibc_prefix), "%s/glibc", prefix);
         (void) setenv("HOME", home, 1);
         (void) setenv("PREFIX", prefix, 1);
+        (void) setenv("GLIBC_PREFIX", glibc_prefix, 1);
         (void) setenv("PATH", path_value, 1);
         (void) setenv("SHELL", "/system/bin/sh", 1);
         (void) setenv("TERM", "xterm-256color", 1);
