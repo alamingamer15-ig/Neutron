@@ -42,7 +42,7 @@ public final class NeutronRuntimeInstaller {
         builder.environment().put("PREFIX", prefix.getAbsolutePath());
         builder.environment().put("HOME", home.getAbsolutePath());
         builder.environment().put("PATH", prefix + "/bin:/system/bin:/system/xbin");
-        builder.environment().put("LD_LIBRARY_PATH", prefix + "/lib");
+        builder.environment().remove("LD_LIBRARY_PATH");
         builder.environment().put("TMPDIR", prefix + "/tmp");
         builder.environment().put("LANG", "C.UTF-8");
         builder.environment().put("TERM", "xterm-256color");
