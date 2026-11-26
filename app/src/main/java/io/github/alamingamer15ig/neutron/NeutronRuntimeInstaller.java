@@ -5,7 +5,6 @@ import android.system.Os;
 
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
-import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -18,7 +17,7 @@ import java.nio.file.Paths;
 
 /** Installs Neutron's pinned ARM64 glibc, Wayland and X11 runtime bundle. */
 public final class NeutronRuntimeInstaller {
-    private static final String ASSET_NAME = "neutron-runtime-arm64.tar.gz";
+    private static final String ASSET_NAME = "neutron-runtime-arm64.tar";
     private static final String RUNTIME_MARKER = ".runtime-installed";
     private static final long MAX_UNPACKED_BYTES = 256L * 1024L * 1024L;
 
@@ -84,8 +83,7 @@ public final class NeutronRuntimeInstaller {
         byte[] buffer = new byte[16384];
 
         try (InputStream asset = new BufferedInputStream(context.getAssets().open(ASSET_NAME));
-             GzipCompressorInputStream gzip = new GzipCompressorInputStream(asset);
-             TarArchiveInputStream tar = new TarArchiveInputStream(gzip)) {
+             TarArchiveInputStream tar = new TarArchiveInputStream(asset)) {
             TarArchiveEntry entry;
             while ((entry = tar.getNextTarEntry()) != null) {
                 String name = entry.getName();
